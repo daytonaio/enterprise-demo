@@ -1,0 +1,8 @@
+---
+controller:
+  ingressClassByName: true
+  hostNetwork: true
+  hostPort:
+    enabled: true
+  service:
+    type: ClusterIP

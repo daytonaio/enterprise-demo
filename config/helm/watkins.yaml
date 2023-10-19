@@ -1,0 +1,45 @@
+---
+image:
+  registry: ghcr.io
+  repository: daytonaio/workspace-service
+namespaceOverride: "watkins"
+fullnameOverride: "watkins"
+configuration:
+  defaultWorkspaceClassName: default
+  workspaceNamespace:
+    name: watkins-workspaces
+    create: true
+ingress:
+  enabled: true
+  ingressClassName: "nginx"
+  hostname: watkins.local
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+  tls: true
+  selfSigned: false
+components:
+  workspaceVolumeInit:
+    namespace: watkins
+keycloak:
+  production: false
+postgresql:
+  enabled: true
+gitProviders:
+  github:
+    clientId: "changeme"
+    clientSecret: "changeme"
+rabbitmq:
+  enabled: true
+  nameOverride: "watkins-rabbitmq"
+  persistence:
+    enabled: true
+  auth:
+    username: user
+    password: pass
+    erlangCookie: "secreterlangcookie"
+redis:
+  enabled: true
+  nameOverride: "watkins-redis"
+  auth:
+    enabled: false
+  architecture: standalone
