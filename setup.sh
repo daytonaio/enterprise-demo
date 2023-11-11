@@ -7,9 +7,9 @@ ERROR="\033[1;31m✘\033[0m"
 INFO="\033[1;36mℹ\033[0m"
 
 K3S_VERSION="v1.27.6+k3s1"
-LONGHORN_VERSION="1.5.1"
+LONGHORN_VERSION="1.5.2"
 INGRESS_NGINX_VERSION="4.8.2"
-WATKINS_VERSION="2.58.1"
+WATKINS_VERSION="2.62.13"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
@@ -187,11 +187,128 @@ check_commands() {
     fi
 }
 
+get_ingress_values() {
+
+    cat <<EOF >ingress-values.yaml
+controller:
+  ingressClassByName: true
+  hostNetwork: true
+  hostPort:
+    enabled: true
+  service:
+    type: ClusterIP
+EOF
+
+}
+
+get_longhorn_values() {
+
+    cat <<EOF >longhorn-values.yaml
+persistence:
+  defaultClassReplicaCount: 1
+defaultSettings:
+  priorityClass: system-node-critical
+  deletingConfirmationFlag: true
+  replicaSoftAntiAffinity: true
+  storageOverProvisioningPercentage: 500
+  defaultReplicaCount: 1
+csi:
+  attacherReplicaCount: 1
+  provisionerReplicaCount: 1
+  resizerReplicaCount: 1
+  snapshotterReplicaCount: 1
+longhornUI:
+  replicas: 1
+EOF
+
+}
+
+get_watkins_values() {
+
+    cat <<EOF >watkins-values.yaml
+image:
+  registry: ghcr.io
+  repository: daytonaio/workspace-service
+namespaceOverride: "watkins"
+fullnameOverride: "watkins"
+configuration:
+  defaultWorkspaceClassName: default
+  workspaceNamespace:
+    name: watkins-workspaces
+    create: true
+ingress:
+  enabled: true
+  ingressClassName: "nginx"
+  hostname: $URL
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+  tls: true
+  selfSigned: false
+  extraTls:
+    - hosts:
+        - "*.$URL"
+        - "$URL"
+      secretName: "$URL-tls"
+components:
+  workspaceVolumeInit:
+    namespace: watkins
+keycloak:
+  production: false
+postgresql:
+  enabled: true
+gitProviders:
+  github:
+    clientId: $IDP_ID
+    clientSecret: $IDP_SECRET
+rabbitmq:
+  enabled: true
+  nameOverride: "watkins-rabbitmq"
+  persistence:
+    enabled: true
+  auth:
+    username: user
+    password: pass
+    erlangCookie: "secreterlangcookie"
+redis:
+  enabled: true
+  nameOverride: "watkins-redis"
+  auth:
+    enabled: false
+  architecture: standalone
+EOF
+
+}
+
+get_k3s_config() {
+
+    cat <<EOF >k3s-config.yaml
+write-kubeconfig-mode: 644
+disable:
+  - traefik
+  - servicelb
+  - local-storage
+disable-helm-controller: true
+cluster-init: true
+EOF
+
+}
+
+cleanup() {
+    echo -e "${INFO} Cleaning up..."
+    rm -rf ingress-values.yaml \
+        longhorn-values.yaml \
+        watkins-values.yaml \
+        k3s-config.yaml
+}
+
+trap cleanup EXIT
+
 # Install k3s and setup kubeconfig
 install_k3s() {
 
     # Install k3s using the official installation script
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" K3S_CONFIG_FILE="$PWD/config/k3s/config.yaml" sh - 2>&1 | grep -v "Created symlink" >/dev/null
+    get_k3s_config
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" K3S_CONFIG_FILE="$PWD/k3s-config.yaml" sh - 2>&1 | grep -v "Created symlink" >/dev/null
 
     # Wait for k3s to be ready
     while ! sudo k3s kubectl get nodes &>/dev/null; do
@@ -212,31 +329,50 @@ install_app() {
     kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f - >/dev/null
     kubectl apply -n longhorn-system -f https://raw.githubusercontent.com/longhorn/longhorn/v${LONGHORN_VERSION}/deploy/prerequisite/longhorn-iscsi-installation.yaml >/dev/null
     echo -e "${OK} iSCSI installed."
-    # Disable multipath
-    blacklist_config="blacklist {
+
+    # Check the status of iscsid service for the specified duration
+    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 20)); do sleep 1; done
+
+    # Check if the service became active or exit with an error
+    if systemctl is-active iscsid &>/dev/null; then
+        echo -e "${OK} iscsid service is active."
+    else
+        echo -e "${ERROR} iscsid service did not become active within 10 seconds. Exiting."
+        exit 1
+    fi
+
+    # Check if multipathd service exists and is running
+    if systemctl list-unit-files multipathd.service &>/dev/null; then
+        echo -e "${OK} Multipathd service found, checking configuration."
+
+        # Disable multipath
+        blacklist_config="blacklist {
         devnode \"^sd[a-z0-9]+\"
     }"
-    # Define the path to the multipath.conf file
-    multipath_conf="/etc/multipath.conf"
+        # Define the path to the multipath.conf file
+        multipath_conf="/etc/multipath.conf"
 
-    # Check if the blacklist configuration already exists in the file, if not add it and restart multipathd service
-    if ! grep -q "$blacklist_config" "$multipath_conf"; then
-        echo "$blacklist_config" | sudo tee -a "$multipath_conf" >/dev/null
-        sudo systemctl restart multipathd.service
-        echo -e "${OK} Blacklist configuration added to $multipath_conf."
+        # Check if the blacklist configuration already exists in the file, if not add it and restart multipathd service
+        if ! grep -q "$blacklist_config" "$multipath_conf"; then
+            echo "$blacklist_config" | sudo tee -a "$multipath_conf" >/dev/null
+            sudo systemctl restart multipathd.service
+            echo -e "${OK} Blacklist configuration added to $multipath_conf."
+        else
+            echo -e "${OK} Blacklist configuration already exists in $multipath_conf."
+        fi
     else
-        echo -e "${OK} Blacklist configuration already exists in $multipath_conf."
+        echo -e "${OK} Multipathd service not found or not running."
     fi
 
     echo -e "${INFO} Installing longhorn helm chart"
-    longhorn_yaml="https://raw.githubusercontent.com/daytonaio/installer/main/config/helm/longhorn.yaml"
-    helm upgrade -i --atomic --create-namespace --version ${LONGHORN_VERSION} -n longhorn-system -f $longhorn_yaml --repo https://charts.longhorn.io longhorn longhorn >/dev/null
+    get_longhorn_values
+    helm upgrade -i --atomic --create-namespace --version ${LONGHORN_VERSION} -n longhorn-system -f longhorn-values.yaml --repo https://charts.longhorn.io longhorn longhorn >/dev/null
     check_helm_release longhorn longhorn-system
 
     # Setup ingress-nginx
-    ingress_nginx_yaml="https://raw.githubusercontent.com/daytonaio/installer/main/config/helm/ingress-nginx.yaml"
     echo -e "${INFO} Installing ingress-nginx helm chart"
-    helm upgrade -i --atomic --version ${INGRESS_NGINX_VERSION} -n kube-system -f $ingress_nginx_yaml --repo https://kubernetes.github.io/ingress-nginx ingress-nginx ingress-nginx >/dev/null
+    get_ingress_values
+    helm upgrade -i --atomic --version ${INGRESS_NGINX_VERSION} -n kube-system -f ingress-values.yaml --repo https://kubernetes.github.io/ingress-nginx ingress-nginx ingress-nginx >/dev/null
     check_helm_release ingress-nginx kube-system
 
     # Create wildcard certificate secret to be used by ingress
@@ -249,16 +385,10 @@ install_app() {
         exit 1
     fi
 
-    watkins_yaml="https://raw.githubusercontent.com/daytonaio/installer/main/config/helm/watkins.yaml"
     echo -e "${INFO} Installing watkins helm chart"
+    get_watkins_values
     helm upgrade -i --atomic --timeout 12m --version "${WATKINS_VERSION}" -n watkins \
-        --set gitProviders.github.clientId="${IDP_ID}" \
-        --set gitProviders.github.clientSecret="${IDP_SECRET}" \
-        --set ingress.hostname="${URL}" \
-        --set ingress.extraTls[0].hosts[0]="*.${URL}" \
-        --set ingress.extraTls[0].hosts[1]="${URL}" \
-        --set ingress.extraTls[0].secretName="${URL}-tls" \
-        -f $watkins_yaml watkins oci://ghcr.io/daytonaio/charts/watkins >/dev/null
+        -f watkins-values.yaml watkins oci://ghcr.io/daytonaio/charts/watkins >/dev/null
     check_helm_release watkins watkins
 
     echo -e "${OK} k3s cluster and Watkins application installed in $(get_time)."
@@ -277,7 +407,7 @@ install_app() {
         echo -e "${OK} Watkins workspace container image pulled."
     fi
 
-    while kubectl get pods -n watkins-workspaces --ignore-not-found=true | grep "pull-image" >/dev/null; do
+    while kubectl get pods -n watkins --ignore-not-found=true | grep "pull-image" >/dev/null; do
         echo -ne "                                                            \r"
         echo -ne "${INFO} Waiting on watkins workspace storageClass preload..\r"
         sleep 1
@@ -288,7 +418,7 @@ install_app() {
     echo -e "${OK} Preload operations completed in $(get_time)."
 }
 
-# Function to uninstall k3s and app
+# Function to uninstall k3s and remove longhorn data
 uninstall() {
     # Uninstall k3s using the official uninstallation script
     if [ -f /usr/local/bin/k3s-uninstall.sh ]; then
@@ -313,29 +443,15 @@ uninstall() {
 
 # Display help message
 display_help() {
-    echo "Usage: $0 [--install|--remove|--help]"
+    echo "Usage: $0 [--remove|--help]"
     echo ""
     echo "Options:"
-    echo "  --install    Install k3s and setup watkins app."
     echo "  --remove     Remove k3s."
     echo "  --help       Display this help message."
 }
 
-# Check if a valid parameter is provided
-if [ "$#" -ne 1 ]; then
-    display_help
-    exit 1
-fi
-
 # Process the provided parameter
 case "$1" in
---install)
-    display_eula
-    check_commands
-    check_prereq
-    install_k3s
-    install_app
-    ;;
 --remove)
     uninstall
     ;;
@@ -343,8 +459,19 @@ case "$1" in
     display_help
     ;;
 *)
-    echo "Invalid parameter. Use --help to see the available options."
-    display_help
-    exit 1
+    if [ "$#" -gt 0 ]; then
+        echo "Invalid parameter. Use --help to see the available options."
+        display_help
+        exit 1
+    fi
     ;;
 esac
+
+# Default run
+if [ "$#" -eq 0 ]; then
+    display_eula
+    check_commands
+    check_prereq
+    install_k3s
+    install_app
+fi

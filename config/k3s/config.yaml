@@ -1,7 +1,0 @@
-write-kubeconfig-mode: 644
-disable:
-  - traefik
-  - servicelb
-  - local-storage
-disable-helm-controller: true
-cluster-init: true

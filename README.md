@@ -22,7 +22,7 @@ Before starting the installation script, please go over all the necessary requir
     * min 16GB RAM
     * min 200GB disk
 * The host needs to have public IP and TCP ports 80, 443, and 30000 opened (also TCP 6443 if you want to access the Kubernetes cluster from your local machine)
-* The script has been currently tested on Debian-based distros (Ubuntu/Debian)
+* The script has been currently tested on Debian-based distros (Ubuntu 22.04/Debian 12)
 
 ### Valid domain
 Registered domain with base domain and wildcard pointed to your host IP where
@@ -43,7 +43,7 @@ Values to set in the identity provider:
 ```
 git clone https://github.com/daytonaio/installer
 cd installer
-./setup.sh --install
+./setup.sh
 ```
 You will need the next 3 values:
 
@@ -53,7 +53,7 @@ You will need the next 3 values:
 ̨̨̨
 After running the script, you will be prompted to input those values:
 ```
-./setup.sh --install
+./setup.sh
 ...
 Enter app hostname (valid domain) (URL): daytona.example.com
 Enter GitHub Client ID (IDP_ID): changeme
@@ -63,7 +63,7 @@ After variables are set, the prompt will show you A records that need to be adde
 
 It is also possible to set all three values via CLI when running the script:
 ```
-URL="daytona.example.com" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh --install
+URL="daytona.example.com" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
 ```
 
 ## Restart/Cleanup
