@@ -61,7 +61,22 @@ Enter GitHub Client Secret (IDP_SECRET): changeme
 ```
 After variables are set, the prompt will show you A records that need to be added to your DNS zone, and certbot will also show you information on how to edit your DNS zone in order to get a valid wildcard certificate, so please follow the instructions.
 
-It is also possible to set all three values via CLI when running the script:
+It is also possible to set all 3 values via CLI when running the script:
+```
+URL="daytona.example.com" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
+```
+
+## Update
+
+To update existing setup you simply need to run script again on the same machine. Be sure to download latest `setup.sh` and run it again:
+
+```
+./setup.sh
+```
+
+If you used prompt to provide `URL`, `IDP_ID`, `IDP_SECRET` you will need to input those values again. Certificate setup, if still valid, will be skiped.
+
+If you used CLI with those 3 values set, you can simply repeat that command:
 ```
 URL="daytona.example.com" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
 ```
