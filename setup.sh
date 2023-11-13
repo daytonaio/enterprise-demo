@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export LC_ALL=en_US.UTF-8
+export LC_CTYPE=UTF-8
+
 start_time=$(date +%s)
 
 OK="\033[1;32m✔\033[0m"
@@ -42,12 +45,14 @@ display_eula() {
 
     # Set the default value to "yes" if the user just presses Enter
     choice=${choice:-"yes"}
+    # Convert the choice to lowercase
+    choice_lower=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
 
     # Check the user's choice
-    if [ "$choice" = "yes" ]; then
+    if [ "$choice_lower" = "yes" ] || [ "$choice_lower" = "y" ]; then
         echo -e "${OK} You have accepted the license agreement. Proceeding with the installation..."
     else
-        echo -e "${OK} You have declined the license agreement. Installation aborted."
+        echo -e "${ERROR} You have declined the license agreement. Installation aborted."
         exit 1
     fi
 }
@@ -74,19 +79,25 @@ check_prereq() {
         local prompt="$2"
 
         if [ -z "${!var_name}" ]; then
-            read -r -p "$prompt" "${var_name?}"
+            if [ "$var_name" == "IDP_SECRET" ]; then
+                read -rs -p "$prompt" "${var_name?}"
+            else
+                read -r -p "$prompt" "${var_name?}"
+            fi
         fi
+
     }
 
     # Check again if any of the values are missing
     if [ -z "$URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "${INFO} Please check README on how to obtain values for required variables"
         echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m\n"
-        check_and_prompt "URL" "Enter app hostname (valid domain) (URL): "
-        check_and_prompt "IDP_ID" "Enter IdP Client ID (IDP_ID): "
-        check_and_prompt "IDP_SECRET" "Enter IdP Client Secret (IDP_SECRET): "
+        check_and_prompt "URL" "Enter app hostname (valid domain) [URL]: "
+        check_and_prompt "IDP_ID" "Enter IdP Client ID [IDP_ID]: "
+        check_and_prompt "IDP_SECRET" "Enter IdP Client Secret (IDP_SECRET) (input hidden): "
         echo -e "\n"
     fi
+    echo "$IDP_SECRET"
 
     if [ -z "$URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "\n${ERROR} One or more of the required variables are not set. Please repeat installation script. Exiting..."
@@ -160,20 +171,21 @@ command_exists() {
 
 # Install tools needed
 check_commands() {
+
+    if ! command_exists "curl"; then
+        echo -e "${INFO} curl is not installed. Installing..."
+        sudo apt-get update >/dev/null
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl >/dev/null
+        if curl --version &>/dev/null; then
+            echo -e "${OK} curl is installed."
+        fi
+    fi
+
     if ! command_exists "helm"; then
         echo -e "${INFO} helm is not installed. Installing..."
         curl -sfL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash >/dev/null
         if helm version &>/dev/null; then
             echo -e "${OK} helm is installed."
-        fi
-    fi
-
-    if ! command_exists "yq"; then
-        echo -e "${INFO} yq is not installed. Installing..."
-        sudo curl -sL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-        sudo chmod a+x /usr/local/bin/yq
-        if yq --version &>/dev/null; then
-            echo -e "${OK} yq is installed."
         fi
     fi
 
@@ -428,7 +440,7 @@ uninstall() {
         echo -e "${OK} k3s has not been found."
     fi
 
-    for cmd in helm yq; do
+    for cmd in helm; do
         if command_exists $cmd; then
             sudo rm /usr/local/bin/$cmd
             echo -e "${OK} $cmd removed."
