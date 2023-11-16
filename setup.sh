@@ -12,7 +12,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.27.6+k3s1"
 LONGHORN_VERSION="1.5.2"
 INGRESS_NGINX_VERSION="4.8.2"
-WATKINS_VERSION="2.62.13"
+WATKINS_VERSION="2.63.2"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
@@ -349,7 +349,7 @@ install_app() {
     if systemctl is-active iscsid &>/dev/null; then
         echo -e "${OK} iscsid service is active."
     else
-        echo -e "${ERROR} iscsid service did not become active within 10 seconds. Exiting."
+        echo -e "${ERROR} iscsid service did not become active within 20 seconds. Please repeat installation script. Exiting..."
         exit 1
     fi
 
