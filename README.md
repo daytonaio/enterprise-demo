@@ -47,11 +47,12 @@ cd installer
 ```
 You will need the next 3 values:
 
-* `URL` - domain name you have set in your DNS provider and pointing to IP address of the machine where you are deploying Daytona
-* `IDP` - name of identity provider to use (available are: github, gitlab and bitbucket)
-* `IDP_ID` - client ID you get from your identity provider as stated in [Requirements](#requirements)
-* `IDP_SECRET` - client secret you get from your identity provider as stated in [Requirements](#requirements)
-̨̨̨
+* `URL` - (required) domain name you have set in your DNS provider and pointing to IP address of the machine where you are deploying Daytona
+* `IDP` - (required) name of identity provider to use (available are: github, gitlab, bitbucket and gitlabSelfManaged)
+* `IDP_ID` - (required) client ID you get from your identity provider as stated in [Requirements](#requirements)
+* `IDP_SECRET` - (required) client secret you get from your identity provider as stated in [Requirements](#requirements)
+* `IDP_URL` - (required if IDP is `gitlabSelfManaged`) This is the base URL of your hosted Git provider. Currently only Gitlab is supported
+
 After running the script, you will be prompted to input those values:
 ```
 ./setup.sh
@@ -61,6 +62,7 @@ Identity Providers (IdP) available:
 1) github
 2) gitlab
 3) bitbucket
+4) gitlabSelfManaged
 Choose an IdP (type the number and press Enter): 1
 Enter IdP Client ID [IDP_ID]: changeme
 Enter IdP Client Secret (IDP_SECRET) (input hidden):
@@ -72,6 +74,11 @@ It is also possible to set all 3 values via CLI when running the script:
 URL="daytona.example.com" IDP="github" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
 ```
 
+If using self-hosted Gitlab then you need all 4 values:
+```
+URL="daytona.example.com" IDP="gitlabSelfManaged" IDP_URL="gitlab.example.com" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
+```
+
 ## Update
 
 To update existing setup you simply need to run script again on the same machine. Be sure to download latest `setup.sh` and run it again:
@@ -80,11 +87,17 @@ To update existing setup you simply need to run script again on the same machine
 ./setup.sh
 ```
 
-If you used prompt to provide `URL`, `IDP_ID`, `IDP_SECRET` you will need to input those values again. Certificate setup, if still valid, will be skiped.
+If you used prompt to provide `URL`, `IDP_ID` and `IDP_SECRET` you will need to input those values again. Certificate setup, if still valid, will be skiped.
 
 If you used CLI with those 3 values set, you can simply repeat that command:
 ```
-URL="daytona.example.com" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
+URL="daytona.example.com" IDP=github IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
+```
+
+or if using self-managed Git provider
+
+```
+URL="daytona.example.com" IDP=gitlabSelfManaged IDP_URL=gitlab.example.com IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
 ```
 
 ## Restart/Cleanup
