@@ -48,6 +48,7 @@ cd installer
 You will need the next 3 values:
 
 * `URL` - domain name you have set in your DNS provider and pointing to IP address of the machine where you are deploying Daytona
+* `IDP` - name of identity provider to use (available are: github, gitlab and bitbucket)
 * `IDP_ID` - client ID you get from your identity provider as stated in [Requirements](#requirements)
 * `IDP_SECRET` - client secret you get from your identity provider as stated in [Requirements](#requirements)
 ̨̨̨
@@ -55,15 +56,20 @@ After running the script, you will be prompted to input those values:
 ```
 ./setup.sh
 ...
-Enter app hostname (valid domain) (URL): daytona.example.com
-Enter GitHub Client ID (IDP_ID): changeme
-Enter GitHub Client Secret (IDP_SECRET): changeme
+Enter app hostname (valid domain) [URL]: daytona.example.com
+Identity Providers (IdP) available:
+1) github
+2) gitlab
+3) bitbucket
+Choose an IdP (type the number and press Enter): 1
+Enter IdP Client ID [IDP_ID]: changeme
+Enter IdP Client Secret (IDP_SECRET) (input hidden):
 ```
 After variables are set, the prompt will show you A records that need to be added to your DNS zone, and certbot will also show you information on how to edit your DNS zone in order to get a valid wildcard certificate, so please follow the instructions.
 
 It is also possible to set all 3 values via CLI when running the script:
 ```
-URL="daytona.example.com" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
+URL="daytona.example.com" IDP="github" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
 ```
 
 ## Update

@@ -81,6 +81,27 @@ check_prereq() {
         if [ -z "${!var_name}" ]; then
             if [ "$var_name" == "IDP_SECRET" ]; then
                 read -rs -p "$prompt" "${var_name?}"
+            elif [ "$var_name" == "IDP" ]; then
+                echo -e "$prompt"
+                PS3="Choose an IdP (type the number and press Enter): "
+                options=("github" "gitlab" "bitbucket")
+                select opt in "${options[@]}"; do
+                    case $REPLY in
+                    1)
+                        IDP="github"
+                        break
+                        ;;
+                    2)
+                        IDP="gitlab"
+                        break
+                        ;;
+                    3)
+                        IDP="bitbucket"
+                        break
+                        ;;
+                    *) echo "Invalid option, please choose a number between 1 and 3." ;;
+                    esac
+                done
             else
                 read -r -p "$prompt" "${var_name?}"
             fi
@@ -88,17 +109,27 @@ check_prereq() {
 
     }
 
+    if [ -n "$IDP" ]; then
+        if [ "$IDP" == "github" ] || [ "$IDP" == "gitlab" ] || [ "$IDP" == "bitbucket" ]; then
+            echo -e "${OK} Using IdP from CLI argument: $IDP"
+        else
+            echo -e "${ERROR} IdP not supported. You will be prompted to choose supported one."
+            unset IDP
+        fi
+    fi
+
     # Check again if any of the values are missing
-    if [ -z "$URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
+    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "${INFO} Please check README on how to obtain values for required variables"
         echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m\n"
         check_and_prompt "URL" "Enter app hostname (valid domain) [URL]: "
+        check_and_prompt "IDP" "Identity Providers (IdP) available: "
         check_and_prompt "IDP_ID" "Enter IdP Client ID [IDP_ID]: "
         check_and_prompt "IDP_SECRET" "Enter IdP Client Secret (IDP_SECRET) (input hidden): "
         echo -e "\n"
     fi
 
-    if [ -z "$URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
+    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "\n${ERROR} One or more of the required variables are not set. Please repeat installation script. Exiting..."
         exit 1
     else
@@ -268,7 +299,7 @@ keycloak:
 postgresql:
   enabled: true
 gitProviders:
-  github:
+  $IDP:
     clientId: $IDP_ID
     clientSecret: $IDP_SECRET
 rabbitmq:
