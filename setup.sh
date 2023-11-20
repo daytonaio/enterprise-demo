@@ -97,7 +97,6 @@ check_prereq() {
         check_and_prompt "IDP_SECRET" "Enter IdP Client Secret (IDP_SECRET) (input hidden): "
         echo -e "\n"
     fi
-    echo "$IDP_SECRET"
 
     if [ -z "$URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "\n${ERROR} One or more of the required variables are not set. Please repeat installation script. Exiting..."
@@ -138,13 +137,13 @@ check_prereq() {
                 break
             else
                 ((ATTEMPT++)) # Increment the attempt counter
-                echo -e "${ERROR} Certifiate not validated. Retrying... Attempt $ATTEMPT of $MAX_ATTEMPTS."
+                echo -e "${ERROR} Certificate not validated. Retrying... Attempt $ATTEMPT of $MAX_ATTEMPTS."
                 sleep 1
             fi
         done
 
         if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
-            echo -e "${ERROR} Maximum attempts reached. Certifiate not validated. Please repeat installation script. Exiting..."
+            echo -e "${ERROR} Maximum attempts reached. Certificate not validated. Please repeat installation script. Exiting..."
             exit 1
         fi
     fi
@@ -406,6 +405,10 @@ install_app() {
     echo -e "${OK} k3s cluster and Watkins application installed in $(get_time)."
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
     echo -e "${INFO} To access dashboard go to https://${URL}"
+    echo -e "\n--------------------------------------------------------------------------------------------------\n"
+    echo -e "${INFO} To access keycloak admin console go to https://id.${URL}"
+    echo -e "  Username: admin"
+    echo -e "  Password: $(kubectl get secret -n watkins watkins-watkins-keycloak -o=jsonpath='{.data.admin-password}' | base64 --decode)"
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
     start_time=$(date +%s)
     echo -e "${INFO} You are advised to wait for preload operations to finish before you create your first workspace."
