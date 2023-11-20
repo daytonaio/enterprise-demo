@@ -12,7 +12,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.27.6+k3s1"
 LONGHORN_VERSION="1.5.2"
 INGRESS_NGINX_VERSION="4.8.2"
-WATKINS_VERSION="2.63.2"
+WATKINS_VERSION="2.66.1"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
@@ -84,22 +84,29 @@ check_prereq() {
             elif [ "$var_name" == "IDP" ]; then
                 echo -e "$prompt"
                 PS3="Choose an IdP (type the number and press Enter): "
-                options=("github" "gitlab" "bitbucket")
+                options=("github" "gitlab" "bitbucket" "gitlabSelfManaged")
                 select opt in "${options[@]}"; do
                     case $REPLY in
                     1)
                         IDP="github"
+                        IDP_URL="none"
                         break
                         ;;
                     2)
                         IDP="gitlab"
+                        IDP_URL="none"
                         break
                         ;;
                     3)
                         IDP="bitbucket"
+                        IDP_URL="none"
                         break
                         ;;
-                    *) echo "Invalid option, please choose a number between 1 and 3." ;;
+                    4)
+                        IDP="gitlabSelfManaged"
+                        break
+                        ;;
+                    *) echo "Invalid option, please choose a number between 1 and 4." ;;
                     esac
                 done
             else
@@ -110,7 +117,7 @@ check_prereq() {
     }
 
     if [ -n "$IDP" ]; then
-        if [ "$IDP" == "github" ] || [ "$IDP" == "gitlab" ] || [ "$IDP" == "bitbucket" ]; then
+        if [ "$IDP" == "github" ] || [ "$IDP" == "gitlab" ] || [ "$IDP" == "bitbucket" ] || [ "$IDP" == "gitlabSelfManaged" ]; then
             echo -e "${OK} Using IdP from CLI argument: $IDP"
         else
             echo -e "${ERROR} IdP not supported. You will be prompted to choose supported one."
@@ -119,18 +126,24 @@ check_prereq() {
     fi
 
     # Check again if any of the values are missing
-    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
+    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "${INFO} Please check README on how to obtain values for required variables"
-        echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m\n"
+        echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m"
         check_and_prompt "URL" "Enter app hostname (valid domain) [URL]: "
-        check_and_prompt "IDP" "Identity Providers (IdP) available: "
+        check_and_prompt "IDP" "Identity Providers (IdP) available [IDP]: "
+        if [ "$IDP" == "gitlabSelfManaged" ]; then
+            check_and_prompt "IDP_URL" "Enter the base URL for gitlabSelfManaged [IDP_URL]: "
+        fi
         check_and_prompt "IDP_ID" "Enter IdP Client ID [IDP_ID]: "
-        check_and_prompt "IDP_SECRET" "Enter IdP Client Secret (IDP_SECRET) (input hidden): "
+        check_and_prompt "IDP_SECRET" "Enter IdP Client Secret [IDP_SECRET] (input hidden): "
         echo -e "\n"
     fi
 
     if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "\n${ERROR} One or more of the required variables are not set. Please repeat installation script. Exiting..."
+        exit 1
+    elif [ "$IDP" == "gitlabSelfManaged" ] && [ -z "$IDP_URL" ]; then
+        echo -e "\n${ERROR} IDP_URL is not set for gitlabSelfManaged. Please set IDP_URL. Exiting..."
         exit 1
     else
         echo -e "${OK} All required variables set."
@@ -302,6 +315,7 @@ gitProviders:
   $IDP:
     clientId: $IDP_ID
     clientSecret: $IDP_SECRET
+    baseURL: $IDP_URL
 rabbitmq:
   enabled: true
   nameOverride: "watkins-rabbitmq"
@@ -373,13 +387,13 @@ install_app() {
     echo -e "${OK} iSCSI installed."
 
     # Check the status of iscsid service for the specified duration
-    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 20)); do sleep 1; done
+    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 60)); do sleep 1; done
 
     # Check if the service became active or exit with an error
     if systemctl is-active iscsid &>/dev/null; then
         echo -e "${OK} iscsid service is active."
     else
-        echo -e "${ERROR} iscsid service did not become active within 20 seconds. Please repeat installation script. Exiting..."
+        echo -e "${ERROR} iscsid service did not become active within 60 seconds. Please repeat installation script. Exiting..."
         exit 1
     fi
 
