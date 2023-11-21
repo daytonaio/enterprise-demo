@@ -12,7 +12,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.27.6+k3s1"
 LONGHORN_VERSION="1.5.2"
 INGRESS_NGINX_VERSION="4.8.2"
-WATKINS_VERSION="2.66.1"
+WATKINS_VERSION="2.67.2"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
@@ -84,29 +84,30 @@ check_prereq() {
             elif [ "$var_name" == "IDP" ]; then
                 echo -e "$prompt"
                 PS3="Choose an IdP (type the number and press Enter): "
-                options=("github" "gitlab" "bitbucket" "gitlabSelfManaged")
+                options=("github" "gitlab" "bitbucket" "gitlabSelfManaged" "githubEnterpriseServer")
                 select opt in "${options[@]}"; do
                     case $REPLY in
                     1)
                         IDP="github"
-                        IDP_URL="none"
                         break
                         ;;
                     2)
                         IDP="gitlab"
-                        IDP_URL="none"
                         break
                         ;;
                     3)
                         IDP="bitbucket"
-                        IDP_URL="none"
                         break
                         ;;
                     4)
                         IDP="gitlabSelfManaged"
                         break
                         ;;
-                    *) echo "Invalid option, please choose a number between 1 and 4." ;;
+                    5)
+                        IDP="githubEnterpriseServer"
+                        break
+                        ;;
+                    *) echo "Invalid option, please choose a number between 1 and 5." ;;
                     esac
                 done
             else
@@ -117,10 +118,20 @@ check_prereq() {
     }
 
     if [ -n "$IDP" ]; then
-        if [ "$IDP" == "github" ] || [ "$IDP" == "gitlab" ] || [ "$IDP" == "bitbucket" ] || [ "$IDP" == "gitlabSelfManaged" ]; then
+        supported_idps=("github" "gitlab" "bitbucket" "gitlabSelfManaged" "githubEnterpriseServer")
+        is_supported=false
+
+        for supported_idp in "${supported_idps[@]}"; do
+            if [ "$supported_idp" = "$IDP" ]; then
+                is_supported=true
+                break
+            fi
+        done
+
+        if $is_supported; then
             echo -e "${OK} Using IdP from CLI argument: $IDP"
         else
-            echo -e "${ERROR} IdP not supported. You will be prompted to choose supported one."
+            echo -e "${ERROR} IdP not supported. You will be prompted to choose a supported one."
             unset IDP
         fi
     fi
@@ -128,15 +139,19 @@ check_prereq() {
     # Check again if any of the values are missing
     if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "${INFO} Please check README on how to obtain values for required variables"
-        echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m"
+        echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m\n"
         check_and_prompt "URL" "Enter app hostname (valid domain) [URL]: "
         check_and_prompt "IDP" "Identity Providers (IdP) available [IDP]: "
         if [ "$IDP" == "gitlabSelfManaged" ]; then
-            check_and_prompt "IDP_URL" "Enter the base URL for gitlabSelfManaged [IDP_URL]: "
+            check_and_prompt "IDP_URL" "Enter the base URL for GitLab self-managed [IDP_URL]: "
+        fi
+        if [ "$IDP" == "githubEnterpriseServer" ]; then
+            check_and_prompt "IDP_URL" "Enter the base URL for GitHub Enterprise [IDP_URL]: "
+            check_and_prompt "IDP_API_URL" "Enter the API URL for GitHub Enterprise [IDP_API_URL]: "
         fi
         check_and_prompt "IDP_ID" "Enter IdP Client ID [IDP_ID]: "
         check_and_prompt "IDP_SECRET" "Enter IdP Client Secret [IDP_SECRET] (input hidden): "
-        echo -e "\n"
+        #echo -e "\n"
     fi
 
     if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
@@ -145,8 +160,12 @@ check_prereq() {
     elif [ "$IDP" == "gitlabSelfManaged" ] && [ -z "$IDP_URL" ]; then
         echo -e "\n${ERROR} IDP_URL is not set for gitlabSelfManaged. Please set IDP_URL. Exiting..."
         exit 1
+    elif [ "$IDP" == "githubEnterpriseServer" ] && ([ -z "$IDP_URL" ] || [ -z "$IDP_API_URL" ]); then
+        echo -e "\n${ERROR} IDP_URL and/or IDP_API_URL is not set for githubEnterpriseServer. Please set both. Exiting..."
+        exit 1
     else
-        echo -e "${OK} All required variables set."
+        echo "$IDP_API_URL"
+        echo -e "\n${OK} All required variables set."
     fi
 
     # Use certbot to get wildcard cert for your domain
@@ -316,6 +335,7 @@ gitProviders:
     clientId: $IDP_ID
     clientSecret: $IDP_SECRET
     baseURL: $IDP_URL
+    apiURL: $IDP_API_URL
 rabbitmq:
   enabled: true
   nameOverride: "watkins-rabbitmq"
