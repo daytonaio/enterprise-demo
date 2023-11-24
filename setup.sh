@@ -334,8 +334,8 @@ gitProviders:
   $IDP:
     clientId: $IDP_ID
     clientSecret: $IDP_SECRET
-    baseURL: $IDP_URL
-    apiURL: $IDP_API_URL
+    baseUrl: $IDP_URL
+    apiUrl: $IDP_API_URL
 rabbitmq:
   enabled: true
   nameOverride: "watkins-rabbitmq"
