@@ -12,7 +12,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.27.6+k3s1"
 LONGHORN_VERSION="1.5.2"
 INGRESS_NGINX_VERSION="4.8.2"
-WATKINS_VERSION="2.67.2"
+WATKINS_VERSION="2.67.4"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
