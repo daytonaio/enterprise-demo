@@ -354,9 +354,8 @@ EOF
 }
 
 get_k3s_config() {
-sudo mkdir -p /etc/rancher/k3s
-sudo bash -c 'cat <<EOF > /etc/rancher/k3s/config.yaml
-    cat <<EOF >k3s-config.yaml
+    sudo mkdir -p /etc/rancher/k3s
+    sudo bash -c 'cat <<EOF > /etc/rancher/k3s/config.yaml
 write-kubeconfig-mode: 644
 disable:
   - traefik
