@@ -354,8 +354,8 @@ EOF
 }
 
 get_k3s_config() {
-
-    cat <<EOF >k3s-config.yaml
+    sudo mkdir -p /etc/rancher/k3s
+    sudo bash -c 'cat <<EOF > /etc/rancher/k3s/config.yaml
 write-kubeconfig-mode: 644
 disable:
   - traefik
@@ -363,7 +363,7 @@ disable:
   - local-storage
 disable-helm-controller: true
 cluster-init: true
-EOF
+EOF'
 
 }
 
@@ -371,8 +371,7 @@ cleanup() {
     echo -e "${INFO} Cleaning up..."
     rm -rf ingress-values.yaml \
         longhorn-values.yaml \
-        watkins-values.yaml \
-        k3s-config.yaml
+        watkins-values.yaml
 }
 
 trap cleanup EXIT
@@ -382,7 +381,7 @@ install_k3s() {
 
     # Install k3s using the official installation script
     get_k3s_config
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" K3S_CONFIG_FILE="$PWD/k3s-config.yaml" sh - 2>&1 | grep -v "Created symlink" >/dev/null
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" sh - 2>&1 | grep -v "Created symlink" >/dev/null
 
     # Wait for k3s to be ready
     while ! sudo k3s kubectl get nodes &>/dev/null; do
