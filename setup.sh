@@ -9,10 +9,10 @@ OK="\033[1;32m✔\033[0m"
 ERROR="\033[1;31m✘\033[0m"
 INFO="\033[1;36mℹ\033[0m"
 
-K3S_VERSION="v1.27.6+k3s1"
-LONGHORN_VERSION="1.5.2"
-INGRESS_NGINX_VERSION="4.8.2"
-WATKINS_VERSION="2.67.4"
+K3S_VERSION="v1.28.4+k3s1"
+LONGHORN_VERSION="1.5.3"
+INGRESS_NGINX_VERSION="4.8.4"
+WATKINS_VERSION="2.73.0"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
@@ -38,7 +38,7 @@ display_eula() {
 
     # Display the license agreement
     echo -e "${INFO} Before you can install Daytona, you must read and agree to the Non-Commercial License Agreement, which can be found at:"
-    echo -e "📃 \e[1;34mhttps://www.daytona.io/eula-for-non-commercial-use\e[0m\n"
+    echo -e "📃 \e[1;34mhttps://www.daytona.io/eula\e[0m\n"
 
     # Prompt the user for acceptance (default is "yes" when Enter is pressed)
     read -r -p "Do you accept the terms of the license agreement? (yes/no) [yes]: " choice
@@ -326,8 +326,6 @@ ingress:
 components:
   workspaceVolumeInit:
     namespace: watkins
-keycloak:
-  production: false
 postgresql:
   enabled: true
 gitProviders:
