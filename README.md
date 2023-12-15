@@ -51,7 +51,7 @@ Here is the prompt you will receive if you choose Github IdP for example:
 ```
 ./setup.sh
 ...
-Enter app hostname (valid domain) [URL]: daytona.example.com
+Enter app hostname (valid domain) [FQDN]: daytona.example.com
 Identity Providers (IdP) available [IDP]:
 1) github
 2) gitlab

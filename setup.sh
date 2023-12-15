@@ -12,7 +12,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.28.4+k3s1"
 LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.4"
-WATKINS_VERSION="2.73.0"
+WATKINS_VERSION="2.76.1"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
@@ -140,7 +140,7 @@ check_prereq() {
     if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "${INFO} Please check README on how to obtain values for required variables"
         echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m\n"
-        check_and_prompt "URL" "Enter app hostname (valid domain) [URL]: "
+        check_and_prompt "URL" "Enter app hostname (valid domain) [FQDN]: "
         check_and_prompt "IDP" "Identity Providers (IdP) available [IDP]: "
         if [ "$IDP" == "gitlabSelfManaged" ]; then
             check_and_prompt "IDP_URL" "Enter the base URL for GitLab self-managed [IDP_URL]: "
@@ -326,6 +326,7 @@ ingress:
 components:
   workspaceVolumeInit:
     namespace: watkins
+    excludeJetbrainsCodeEditors: false
 postgresql:
   enabled: true
 gitProviders:
