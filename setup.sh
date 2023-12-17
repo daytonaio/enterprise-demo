@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=UTF-8
@@ -217,13 +218,19 @@ check_helm_release() {
     local release_name="$1"
     local namespace="$2"
 
-    # Check if the release exists
-    if helm status "$release_name" --namespace "$namespace" >/dev/null 2>&1; then
-        echo -e "${OK} Helm chart $release_name installed."
-    else
-        echo -e "${ERROR} Helm chart $release_name not installed."
+    # Check if the release is deployed
+    status=$(helm status -n "$namespace" "$release_name" | awk '/STATUS:/{print $2}')
+
+    if [[ "$status" != "deployed" ]]; then
+        echo -e "${ERROR} The release $release_name is not deployed. Please repeat installation script. Exiting..."
+        helm delete -n "$namespace" "$release_name" --ignore-not-found
+        if [[ "$release_name" == "watkins" ]]; then
+            kubectl delete pvc --all -n "$namespace" --ignore-not-found
+        fi
         exit 1
     fi
+
+    echo -e "${OK} The release '$release_name' is deployed."
 }
 
 # Function to check if a command exists
@@ -363,7 +370,7 @@ disable:
   - servicelb
   - local-storage
 disable-helm-controller: true
-cluster-init: true
+cluster-init: false  # use sqlite instead embedded Etcd
 EOF'
 
 }
