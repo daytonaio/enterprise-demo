@@ -314,6 +314,7 @@ namespaceOverride: "watkins"
 fullnameOverride: "watkins"
 configuration:
   defaultWorkspaceClassName: default
+  defaultPlanPinnedWorkspaces: 10
   workspaceNamespace:
     name: watkins-workspaces
     create: true
