@@ -14,6 +14,7 @@ K3S_VERSION="v1.28.4+k3s1"
 LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.3"
 WATKINS_VERSION="2.80.0"
+TEMPLATE_INDEX_URL="https://raw.githubusercontent.com/daytonaio/samples-index/main/index.json"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
@@ -332,6 +333,8 @@ ingress:
         - "$URL"
       secretName: "$URL-tls"
 components:
+  dashboard:
+    workspaceTemplatesIndexUrl: $TEMPLATE_INDEX_URL
   workspaceVolumeInit:
     namespace: watkins
     excludeJetbrainsCodeEditors: false
