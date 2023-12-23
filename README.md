@@ -23,6 +23,7 @@ Before starting the installation script, please go over all the necessary requir
     * min 200GB disk
 * The host needs to have public IP and TCP ports 80, 443, and 30000 opened (also TCP 6443 if you want to access the Kubernetes cluster from your local machine)
 * The script has been currently tested on Debian-based distros (Ubuntu 22.04/Ubuntu 23.04/Debian 12)
+* Needs to be installed directly on the host no additional isolation is supported HyeberV, Proxmox, or similar
 
 ### Valid domain
 Registered domain with base domain and wildcard pointed to your host IP where
