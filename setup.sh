@@ -13,7 +13,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.28.4+k3s1"
 LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.3"
-WATKINS_VERSION="2.82.0"
+WATKINS_VERSION="2.83.0"
 
 echo -e "\n"
 echo -e "    ██╗ ██╗ ██╗ "
@@ -315,6 +315,7 @@ fullnameOverride: "watkins"
 configuration:
   defaultWorkspaceClassName: default
   defaultPlanPinnedWorkspaces: 10
+  defaultSubscriptionSeats: 10
   workspaceNamespace:
     name: watkins-workspaces
     create: true
