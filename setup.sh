@@ -278,6 +278,8 @@ controller:
     enabled: true
   service:
     type: ClusterIP
+  updateStrategy:
+    type: Recreate
 EOF
 
 }
