@@ -13,6 +13,8 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUBBOT_TOKEN }}
 
     - name: Install Helm
       uses: azure/setup-helm@v3
@@ -30,3 +32,4 @@ jobs:
         file_pattern: README.md
         branch: main
         commit_message: 'docs: update README.md version badge [skip ci]'
+        push_options: --force
