@@ -15,14 +15,16 @@ LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.3"
 WATKINS_VERSION="2.83.0"
 
-echo -e "\n"
-echo -e "    ██╗ ██╗ ██╗ "
-echo -e "   ██╔╝████████╗"
-echo -e "  ██╔╝ ╚██╔═██╔╝"
-echo -e " ██╔╝  ████████╗"
-echo -e "██╔╝   ╚██╔═██╔╝"
-echo -e "╚═╝     ╚═╝ ╚═╝ "
-echo -e "\n"
+display_logo() {
+    echo -e "\n"
+    echo -e "    ██╗ ██╗ ██╗ "
+    echo -e "   ██╔╝████████╗"
+    echo -e "  ██╔╝ ╚██╔═██╔╝"
+    echo -e " ██╔╝  ████████╗"
+    echo -e "██╔╝   ╚██╔═██╔╝"
+    echo -e "╚═╝     ╚═╝ ╚═╝ "
+    echo -e "\n"
+}
 
 machine_arch=$(uname -m)
 
@@ -36,6 +38,7 @@ display_eula() {
 
     # Display the welcome message
     echo "Welcome to the installation process for Daytona."
+    echo -e "App version: $(display_version)\n"
 
     # Display the license agreement
     echo -e "${INFO} Before you can install Daytona, you must read and agree to the Non-Commercial License Agreement, which can be found at:"
@@ -386,7 +389,7 @@ cleanup() {
         watkins-values.yaml
 }
 
-trap cleanup EXIT
+trap '[[ $1 != "--version" && $1 != "--help" ]] && cleanup' EXIT
 
 # Install k3s and setup kubeconfig
 install_k3s() {
@@ -488,11 +491,11 @@ install_app() {
     echo -e "${INFO} You are advised to wait for preload operations to finish before you create your first workspace."
     echo -e "${INFO} Running preload operations so there is no wait time on initial workspace creation..."
 
-    if sudo k3s ctr i ls | grep ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null 2>&1; then
+    if sudo k3s ctr i ls | grep ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null 2>&1; then
         echo -e "${OK} Watkins workspace container image exists."
     else
         echo -e "${INFO} Pulling watkins workspace container image..."
-        sudo k3s ctr i pull ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null
+        sudo k3s ctr i pull ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null
         echo -e "${OK} Watkins workspace container image pulled."
     fi
 
@@ -530,19 +533,34 @@ uninstall() {
     fi
 }
 
+display_version() {
+    if command_exists "helm"; then
+        version=$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')
+    else
+        # Read the version line from README.md. Suitable for first time installs
+        version=$(grep -oP 'APP_VERSION-\K[0-9]+\.[0-9]+\.[0-9]+' README.md)
+    fi
+    echo "$version"
+}
+
 # Display help message
 display_help() {
-    echo "Usage: $0 [--remove|--help]"
+    echo "Usage: $0 [--remove|--version|--help]"
     echo ""
     echo "Options:"
     echo "  --remove     Remove k3s."
+    echo "  --version    Display app version to be installed."
     echo "  --help       Display this help message."
 }
 
 # Process the provided parameter
 case "$1" in
 --remove)
+    display_logo
     uninstall
+    ;;
+--version)
+    echo "Current app version: $(display_version)"
     ;;
 --help)
     display_help
@@ -558,6 +576,7 @@ esac
 
 # Default run
 if [ "$#" -eq 0 ]; then
+    display_logo
     display_eula
     check_commands
     check_prereq
