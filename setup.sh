@@ -10,10 +10,10 @@ OK="\033[1;32m✔\033[0m"
 ERROR="\033[1;31m✘\033[0m"
 INFO="\033[1;36mℹ\033[0m"
 
-K3S_VERSION="v1.28.4+k3s1"
+K3S_VERSION="v1.28.5+k3s1"
 LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.3"
-WATKINS_VERSION="2.83.2"
+WATKINS_VERSION="2.85.1"
 
 display_logo() {
     echo -e "\n"
@@ -141,7 +141,7 @@ check_prereq() {
     fi
 
     # Check again if any of the values are missing
-    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
+    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "${INFO} Please check README on how to obtain values for required variables"
         echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m\n"
         check_and_prompt "URL" "Enter app hostname (valid domain) [FQDN]: "
@@ -168,8 +168,7 @@ check_prereq() {
         echo -e "\n${ERROR} IDP_URL and/or IDP_API_URL is not set for githubEnterpriseServer. Please set both. Exiting..."
         exit 1
     else
-        echo "$IDP_API_URL"
-        echo -e "\n${OK} All required variables set."
+        echo -e "${OK} All required variables set."
     fi
 
     # Use certbot to get wildcard cert for your domain
@@ -291,6 +290,7 @@ get_longhorn_values() {
 
     cat <<EOF >longhorn-values.yaml
 persistence:
+  defaultClass: false
   defaultClassReplicaCount: 1
 defaultSettings:
   priorityClass: system-node-critical
@@ -339,6 +339,8 @@ ingress:
       secretName: "$URL-tls"
 components:
   workspaceVolumeInit:
+    pullImages:
+      storageClassName: "longhorn"
     namespace: watkins
     excludeJetbrainsCodeEditors: false
 postgresql:
@@ -375,7 +377,6 @@ write-kubeconfig-mode: 644
 disable:
   - traefik
   - servicelb
-  - local-storage
 disable-helm-controller: true
 cluster-init: false  # use sqlite instead embedded Etcd
 EOF'
@@ -417,15 +418,15 @@ install_app() {
     kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f - >/dev/null
     kubectl apply -n longhorn-system -f https://raw.githubusercontent.com/longhorn/longhorn/v${LONGHORN_VERSION}/deploy/prerequisite/longhorn-iscsi-installation.yaml >/dev/null
     echo -e "${OK} iSCSI installed."
-
+    echo -e "${INFO} Checking if iscid service is active..."
     # Check the status of iscsid service for the specified duration
-    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 60)); do sleep 1; done
+    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 120)); do sleep 1; done
 
     # Check if the service became active or exit with an error
     if systemctl is-active iscsid &>/dev/null; then
         echo -e "${OK} iscsid service is active."
     else
-        echo -e "${ERROR} iscsid service did not become active within 60 seconds. Please repeat installation script. Exiting..."
+        echo -e "${ERROR} iscsid service did not become active within 120 seconds. Please repeat installation script. Exiting..."
         exit 1
     fi
 
@@ -476,7 +477,7 @@ install_app() {
     echo -e "${INFO} Installing watkins helm chart"
     get_watkins_values
     helm upgrade -i --atomic --timeout 12m --version "${WATKINS_VERSION}" -n watkins \
-        -f watkins-values.yaml watkins oci://ghcr.io/daytonaio/charts/watkins >/dev/null
+        -f watkins-values.yaml watkins oci://ghcr.io/daytonaio/charts/watkins 2>&1 >/dev/null | grep -v -E 'Pulled:|Digest:|coalesce|warnings.go'
     check_helm_release watkins watkins
 
     echo -e "${OK} k3s cluster and Watkins application installed in $(get_time)."
@@ -489,7 +490,7 @@ install_app() {
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
     start_time=$(date +%s)
     echo -e "${INFO} You are advised to wait for preload operations to finish before you create your first workspace."
-    echo -e "${INFO} Running preload operations so there is no wait time on initial workspace creation..."
+    echo -e "${INFO} Running preload operations so there is no wait time on initial workspace creation (will take ~20min)..."
 
     if sudo k3s ctr i ls | grep ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null 2>&1; then
         echo -e "${OK} Watkins workspace container image exists."
