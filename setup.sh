@@ -221,18 +221,22 @@ check_helm_release() {
     local namespace="$2"
 
     # Check if the release is deployed
-    status=$(helm status -n "$namespace" "$release_name" | awk '/STATUS:/{print $2}')
+    status=$(helm status -n "$namespace" "$release_name" 2>/dev/null | awk '/STATUS:/{print $2}')
 
     if [[ "$status" != "deployed" ]]; then
         echo -e "${ERROR} The release $release_name is not deployed. Please repeat installation script. Exiting..."
         helm delete -n "$namespace" "$release_name" --ignore-not-found
-        if [[ "$release_name" == "watkins" ]]; then
-            kubectl delete pvc --all -n "$namespace" --ignore-not-found
+        if [[ "$release_name" == "watkins" && "$watkins_first_install" == "yes" ]]; then
+            echo -e "${INFO} Removing watkins PVCs..."
+            kubectl delete pvc --all -n "$namespace" --ignore-not-found >/dev/null
+            exit 1
         fi
         exit 1
     fi
 
-    echo -e "${OK} The release '$release_name' is deployed."
+    if [[ "$calling_function" != "cleanup" ]]; then
+        echo -e "${OK} The release '$release_name' is deployed."
+    fi
 }
 
 # Function to check if a command exists
@@ -384,7 +388,9 @@ EOF'
 }
 
 cleanup() {
+    calling_function="cleanup"
     echo -e "${INFO} Cleaning up..."
+    check_helm_release watkins watkins
     rm -rf ingress-values.yaml \
         longhorn-values.yaml \
         watkins-values.yaml
@@ -418,10 +424,15 @@ install_app() {
     kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f - >/dev/null
     kubectl apply -n longhorn-system -f https://raw.githubusercontent.com/longhorn/longhorn/v${LONGHORN_VERSION}/deploy/prerequisite/longhorn-iscsi-installation.yaml >/dev/null
     echo -e "${OK} iSCSI installed."
-    echo -e "${INFO} Checking if iscid service is active..."
-    # Check the status of iscsid service for the specified duration
-    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 120)); do sleep 1; done
-
+    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 40)); do
+        echo -ne "                                                            \r"
+        echo -ne "${INFO} Checking if iscsid service is active.\r"
+        sleep 1
+        echo -ne "${INFO} Checking if iscsid service is active..\r"
+        sleep 1
+        echo -ne "${INFO} Checking if iscsid service is active...\r"
+        sleep 1
+    done
     # Check if the service became active or exit with an error
     if systemctl is-active iscsid &>/dev/null; then
         echo -e "${OK} iscsid service is active."
@@ -474,10 +485,16 @@ install_app() {
         exit 1
     fi
 
-    echo -e "${INFO} Installing watkins helm chart"
     get_watkins_values
-    helm upgrade -i --atomic --timeout 12m --version "${WATKINS_VERSION}" -n watkins \
-        -f watkins-values.yaml watkins oci://ghcr.io/daytonaio/charts/watkins 2>&1 >/dev/null | grep -v -E 'Pulled:|Digest:|coalesce|warnings.go'
+    if ! helm status -n watkins watkins >/dev/null 2>&1; then
+        watkins_first_install="yes"
+        echo -e "${INFO} Installing watkins helm chart..."
+    else
+        watkins_first_install="no"
+        echo -e "${INFO} Updating watkins helm chart..."
+    fi
+    helm upgrade -i --atomic --timeout 10m --version "${WATKINS_VERSION}" -n watkins \
+        -f watkins-values.yaml watkins oci://ghcr.io/daytonaio/charts/watkins >/dev/null
     check_helm_release watkins watkins
 
     echo -e "${OK} k3s cluster and Watkins application installed in $(get_time)."
@@ -502,6 +519,8 @@ install_app() {
 
     while kubectl get pods -n watkins --ignore-not-found=true | grep "pull-image" >/dev/null; do
         echo -ne "                                                            \r"
+        echo -ne "${INFO} Waiting on watkins workspace storageClass preload.\r"
+        sleep 1
         echo -ne "${INFO} Waiting on watkins workspace storageClass preload..\r"
         sleep 1
         echo -ne "${INFO} Waiting on watkins workspace storageClass preload...\r"
