@@ -23,7 +23,8 @@ jobs:
 
     - name: Update Version Badge
       run: |
-        NEW_VERSION=$(helm show chart oci://ghcr.io/daytonaio/charts/watkins 2>/dev/null | grep 'appVersion:' | awk '{print $2}')
+        WATKINS_VERSION=$(awk -F'["]' '/WATKINS_VERSION=/{print $2}' setup.sh)
+        NEW_VERSION=$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')
         sed -i "s/APP_VERSION-[0-9]\+\.[0-9]\+\.[0-9]-blue\+/APP_VERSION-$NEW_VERSION-blue/g" README.md
 
     - name: Commit README.md
