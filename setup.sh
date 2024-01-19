@@ -390,13 +390,16 @@ EOF'
 cleanup() {
     calling_function="cleanup"
     echo -e "${INFO} Cleaning up..."
-    check_helm_release watkins watkins
+
+    if [[ $1 != "--remove" ]]; then
+        check_helm_release watkins watkins
+    fi
     rm -rf ingress-values.yaml \
         longhorn-values.yaml \
         watkins-values.yaml
 }
 
-trap '[[ $1 != "--version" && $1 != "--help" ]] && cleanup' EXIT
+trap '[[ $1 != "--version" && $1 != "--help" ]] && cleanup "$1"' EXIT
 
 # Install k3s and setup kubeconfig
 install_k3s() {
