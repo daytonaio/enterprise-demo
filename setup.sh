@@ -342,6 +342,8 @@ ingress:
         - "$URL"
       secretName: "$URL-tls"
 components:
+  dashboard:
+    workspaceTemplatesIndexUrl: https://raw.githubusercontent.com/daytonaio-templates/index/main/templates.json
   workspaceVolumeInit:
     pullImages:
       storageClassName: "longhorn"
