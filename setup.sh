@@ -13,7 +13,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.28.5+k3s1"
 LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.3"
-WATKINS_VERSION="2.85.1"
+WATKINS_VERSION="2.86.4"
 
 display_logo() {
     echo -e "\n"
@@ -357,6 +357,10 @@ gitProviders:
     clientSecret: $IDP_SECRET
     baseUrl: $IDP_URL
     apiUrl: $IDP_API_URL
+keycloak:
+  image:
+    repository: daytonaio/keycloak
+    tag: 22.0.5-daytona.r0-debian-11
 rabbitmq:
   enabled: true
   nameOverride: "watkins-rabbitmq"
