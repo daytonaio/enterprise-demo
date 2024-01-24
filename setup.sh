@@ -10,20 +10,22 @@ OK="\033[1;32m✔\033[0m"
 ERROR="\033[1;31m✘\033[0m"
 INFO="\033[1;36mℹ\033[0m"
 
-K3S_VERSION="v1.28.4+k3s1"
+K3S_VERSION="v1.28.5+k3s1"
 LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.3"
-WATKINS_VERSION="2.80.0"
+WATKINS_VERSION="2.87.1"
 TEMPLATE_INDEX_URL="https://raw.githubusercontent.com/daytonaio/samples-index/main/index.json"
 
-echo -e "\n"
-echo -e "    ██╗ ██╗ ██╗ "
-echo -e "   ██╔╝████████╗"
-echo -e "  ██╔╝ ╚██╔═██╔╝"
-echo -e " ██╔╝  ████████╗"
-echo -e "██╔╝   ╚██╔═██╔╝"
-echo -e "╚═╝     ╚═╝ ╚═╝ "
-echo -e "\n"
+display_logo() {
+    echo -e "\n"
+    echo -e "    ██╗ ██╗ ██╗ "
+    echo -e "   ██╔╝████████╗"
+    echo -e "  ██╔╝ ╚██╔═██╔╝"
+    echo -e " ██╔╝  ████████╗"
+    echo -e "██╔╝   ╚██╔═██╔╝"
+    echo -e "╚═╝     ╚═╝ ╚═╝ "
+    echo -e "\n"
+}
 
 machine_arch=$(uname -m)
 
@@ -37,6 +39,7 @@ display_eula() {
 
     # Display the welcome message
     echo "Welcome to the installation process for Daytona."
+    echo -e "App version: $(display_version)\n"
 
     # Display the license agreement
     echo -e "${INFO} Before you can install Daytona, you must read and agree to the Non-Commercial License Agreement, which can be found at:"
@@ -139,7 +142,7 @@ check_prereq() {
     fi
 
     # Check again if any of the values are missing
-    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_URL" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
+    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
         echo -e "${INFO} Please check README on how to obtain values for required variables"
         echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m\n"
         check_and_prompt "URL" "Enter app hostname (valid domain) [FQDN]: "
@@ -166,8 +169,7 @@ check_prereq() {
         echo -e "\n${ERROR} IDP_URL and/or IDP_API_URL is not set for githubEnterpriseServer. Please set both. Exiting..."
         exit 1
     else
-        echo "$IDP_API_URL"
-        echo -e "\n${OK} All required variables set."
+        echo -e "${OK} All required variables set."
     fi
 
     # Use certbot to get wildcard cert for your domain
@@ -220,18 +222,22 @@ check_helm_release() {
     local namespace="$2"
 
     # Check if the release is deployed
-    status=$(helm status -n "$namespace" "$release_name" | awk '/STATUS:/{print $2}')
+    status=$(helm status -n "$namespace" "$release_name" 2>/dev/null | awk '/STATUS:/{print $2}')
 
     if [[ "$status" != "deployed" ]]; then
         echo -e "${ERROR} The release $release_name is not deployed. Please repeat installation script. Exiting..."
         helm delete -n "$namespace" "$release_name" --ignore-not-found
-        if [[ "$release_name" == "watkins" ]]; then
-            kubectl delete pvc --all -n "$namespace" --ignore-not-found
+        if [[ "$release_name" == "watkins" && "$watkins_first_install" == "yes" ]]; then
+            echo -e "${INFO} Removing watkins PVCs..."
+            kubectl delete pvc --all -n "$namespace" --ignore-not-found >/dev/null
+            exit 1
         fi
         exit 1
     fi
 
-    echo -e "${OK} The release '$release_name' is deployed."
+    if [[ "$calling_function" != "cleanup" ]]; then
+        echo -e "${OK} The release '$release_name' is deployed."
+    fi
 }
 
 # Function to check if a command exists
@@ -279,6 +285,8 @@ controller:
     enabled: true
   service:
     type: ClusterIP
+  updateStrategy:
+    type: Recreate
 EOF
 
 }
@@ -287,6 +295,7 @@ get_longhorn_values() {
 
     cat <<EOF >longhorn-values.yaml
 persistence:
+  defaultClass: false
   defaultClassReplicaCount: 1
 defaultSettings:
   priorityClass: system-node-critical
@@ -316,6 +325,7 @@ fullnameOverride: "watkins"
 configuration:
   defaultWorkspaceClassName: default
   defaultPlanPinnedWorkspaces: 10
+  defaultSubscriptionSeats: 10
   workspaceNamespace:
     name: watkins-workspaces
     create: true
@@ -336,6 +346,8 @@ components:
   dashboard:
     workspaceTemplatesIndexUrl: $TEMPLATE_INDEX_URL
   workspaceVolumeInit:
+    pullImages:
+      storageClassName: "longhorn"
     namespace: watkins
     excludeJetbrainsCodeEditors: false
 postgresql:
@@ -372,7 +384,6 @@ write-kubeconfig-mode: 644
 disable:
   - traefik
   - servicelb
-  - local-storage
 disable-helm-controller: true
 cluster-init: false  # use sqlite instead embedded Etcd
 EOF'
@@ -380,13 +391,18 @@ EOF'
 }
 
 cleanup() {
+    calling_function="cleanup"
     echo -e "${INFO} Cleaning up..."
+
+    if [[ $1 != "--remove" ]]; then
+        check_helm_release watkins watkins
+    fi
     rm -rf ingress-values.yaml \
         longhorn-values.yaml \
         watkins-values.yaml
 }
 
-trap cleanup EXIT
+trap '[[ $1 != "--version" && $1 != "--help" ]] && cleanup "$1"' EXIT
 
 # Install k3s and setup kubeconfig
 install_k3s() {
@@ -414,15 +430,20 @@ install_app() {
     kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f - >/dev/null
     kubectl apply -n longhorn-system -f https://raw.githubusercontent.com/longhorn/longhorn/v${LONGHORN_VERSION}/deploy/prerequisite/longhorn-iscsi-installation.yaml >/dev/null
     echo -e "${OK} iSCSI installed."
-
-    # Check the status of iscsid service for the specified duration
-    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 60)); do sleep 1; done
-
+    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 40)); do
+        echo -ne "                                                            \r"
+        echo -ne "${INFO} Checking if iscsid service is active.\r"
+        sleep 1
+        echo -ne "${INFO} Checking if iscsid service is active..\r"
+        sleep 1
+        echo -ne "${INFO} Checking if iscsid service is active...\r"
+        sleep 1
+    done
     # Check if the service became active or exit with an error
     if systemctl is-active iscsid &>/dev/null; then
         echo -e "${OK} iscsid service is active."
     else
-        echo -e "${ERROR} iscsid service did not become active within 60 seconds. Please repeat installation script. Exiting..."
+        echo -e "${ERROR} iscsid service did not become active within 120 seconds. Please repeat installation script. Exiting..."
         exit 1
     fi
 
@@ -470,9 +491,15 @@ install_app() {
         exit 1
     fi
 
-    echo -e "${INFO} Installing watkins helm chart"
     get_watkins_values
-    helm upgrade -i --atomic --timeout 12m --version "${WATKINS_VERSION}" -n watkins \
+    if ! helm status -n watkins watkins >/dev/null 2>&1; then
+        watkins_first_install="yes"
+        echo -e "${INFO} Installing watkins helm chart..."
+    else
+        watkins_first_install="no"
+        echo -e "${INFO} Updating watkins helm chart..."
+    fi
+    helm upgrade -i --atomic --timeout 10m --version "${WATKINS_VERSION}" -n watkins \
         -f watkins-values.yaml watkins oci://ghcr.io/daytonaio/charts/watkins >/dev/null
     check_helm_release watkins watkins
 
@@ -486,18 +513,20 @@ install_app() {
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
     start_time=$(date +%s)
     echo -e "${INFO} You are advised to wait for preload operations to finish before you create your first workspace."
-    echo -e "${INFO} Running preload operations so there is no wait time on initial workspace creation..."
+    echo -e "${INFO} Running preload operations so there is no wait time on initial workspace creation (will take ~20min)..."
 
-    if sudo k3s ctr i ls | grep ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null 2>&1; then
+    if sudo k3s ctr i ls | grep ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null 2>&1; then
         echo -e "${OK} Watkins workspace container image exists."
     else
         echo -e "${INFO} Pulling watkins workspace container image..."
-        sudo k3s ctr i pull ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null
+        sudo k3s ctr i pull ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null
         echo -e "${OK} Watkins workspace container image pulled."
     fi
 
     while kubectl get pods -n watkins --ignore-not-found=true | grep "pull-image" >/dev/null; do
         echo -ne "                                                            \r"
+        echo -ne "${INFO} Waiting on watkins workspace storageClass preload.\r"
+        sleep 1
         echo -ne "${INFO} Waiting on watkins workspace storageClass preload..\r"
         sleep 1
         echo -ne "${INFO} Waiting on watkins workspace storageClass preload...\r"
@@ -530,19 +559,34 @@ uninstall() {
     fi
 }
 
+display_version() {
+    if command_exists "helm"; then
+        version=$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')
+    else
+        # Read the version line from README.md. Suitable for first time installs
+        version=$(grep -oP 'APP_VERSION-\K[0-9]+\.[0-9]+\.[0-9]+' README.md)
+    fi
+    echo "$version"
+}
+
 # Display help message
 display_help() {
-    echo "Usage: $0 [--remove|--help]"
+    echo "Usage: $0 [--remove|--version|--help]"
     echo ""
     echo "Options:"
     echo "  --remove     Remove k3s."
+    echo "  --version    Display app version to be installed."
     echo "  --help       Display this help message."
 }
 
 # Process the provided parameter
 case "$1" in
 --remove)
+    display_logo
     uninstall
+    ;;
+--version)
+    echo "Current app version: $(display_version)"
     ;;
 --help)
     display_help
@@ -558,6 +602,7 @@ esac
 
 # Default run
 if [ "$#" -eq 0 ]; then
+    display_logo
     display_eula
     check_commands
     check_prereq

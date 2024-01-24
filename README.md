@@ -10,6 +10,8 @@
 ```
 </div>
 
+![Static Badge](https://img.shields.io/badge/APP_VERSION-8.79.1-blue)
+
 ## Requirements
 
 Before starting the installation script, please go over all the necessary requirements.
