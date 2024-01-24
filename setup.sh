@@ -14,6 +14,7 @@ K3S_VERSION="v1.28.5+k3s1"
 LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.3"
 WATKINS_VERSION="2.87.1"
+TEMPLATE_INDEX_URL="https://raw.githubusercontent.com/daytonaio/samples-index/main/index.json"
 
 display_logo() {
     echo -e "\n"
@@ -343,7 +344,7 @@ ingress:
       secretName: "$URL-tls"
 components:
   dashboard:
-    workspaceTemplatesIndexUrl: https://raw.githubusercontent.com/daytonaio-templates/index/main/templates.json
+    workspaceTemplatesIndexUrl: $TEMPLATE_INDEX_URL
   workspaceVolumeInit:
     pullImages:
       storageClassName: "longhorn"
