@@ -13,7 +13,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.28.5+k3s1"
 LONGHORN_VERSION="1.5.3"
 INGRESS_NGINX_VERSION="4.8.3"
-WATKINS_VERSION="2.87.1"
+WATKINS_VERSION="2.91.2"
 TEMPLATE_INDEX_URL="https://raw.githubusercontent.com/daytonaio/samples-index/main/index.json"
 
 display_logo() {
@@ -323,7 +323,8 @@ image:
 namespaceOverride: "watkins"
 fullnameOverride: "watkins"
 configuration:
-  defaultWorkspaceClassName: default
+  defaultWorkspaceClassName: small
+  workspaceStorageClass: longhorn
   defaultPlanPinnedWorkspaces: 10
   defaultSubscriptionSeats: 10
   workspaceNamespace:
@@ -345,9 +346,6 @@ ingress:
 components:
   dashboard:
     workspaceTemplatesIndexUrl: $TEMPLATE_INDEX_URL
-  workspaceVolumeInit:
-    pullImages:
-      storageClassName: "longhorn"
     namespace: watkins
     excludeJetbrainsCodeEditors: false
 postgresql:
@@ -515,11 +513,11 @@ install_app() {
     echo -e "${INFO} You are advised to wait for preload operations to finish before you create your first workspace."
     echo -e "${INFO} Running preload operations so there is no wait time on initial workspace creation (will take ~20min)..."
 
-    if sudo k3s ctr i ls | grep ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null 2>&1; then
+    if sudo k3s ctr i ls | grep ghcr.io/daytonaio/workspace-service/workspace-image:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null 2>&1; then
         echo -e "${OK} Watkins workspace container image exists."
     else
         echo -e "${INFO} Pulling watkins workspace container image..."
-        sudo k3s ctr i pull ghcr.io/daytonaio/workspace-service/workspace-container-image-sysbox:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null
+        sudo k3s ctr i pull ghcr.io/daytonaio/workspace-service/workspace-image:"$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')" >/dev/null
         echo -e "${OK} Watkins workspace container image pulled."
     fi
 
