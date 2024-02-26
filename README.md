@@ -10,7 +10,7 @@
 ```
 </div>
 
-![Static Badge](https://img.shields.io/badge/APP_VERSION-8.79.1-blue)
+![Static Badge](https://img.shields.io/badge/APP_VERSION-8.83.2-blue)
 
 ## Requirements
 
