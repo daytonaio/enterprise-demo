@@ -1,4 +1,4 @@
-name: Update Version Badge
+name: '[Support] Update Version Badge'
 
 on:
   workflow_dispatch:
