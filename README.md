@@ -22,7 +22,7 @@ Try out a demo version of Daytona Enterprise on a single-node.
 </br>
 
 <p align="center">
-    <a href="https://github.com/daytonaio/daytona/issues/new">Open An Issue</a>
+    <a href="https://github.com/daytonaio/enterprise-demo/issues/new">Open An Issue</a>
     ·
   <a href="https://join.slack.com/t/daytonacommunity/shared_invite/zt-273yohksh-Q5YSB5V7tnQzX2RoTARr7Q">Join Our Slack</a>
     ·
