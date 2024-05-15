@@ -31,6 +31,8 @@ Try out a demo version of Daytona Enterprise on a single-node.
     <a href="https://twitter.com/daytonaio">Twitter</a>
   </p>
 
+<hr/>
+
 ## What is the Daytona Enterprise Demo?
 The Daytona Enterprise Demo is a resource limited, single-node deployment of Daytona's enterprise offering.
 This allows you to experience the capabilities of Daytona Enterprise, demonstrating how it can streamline Development Environment Management (DEM) within your organization.
@@ -38,9 +40,9 @@ This allows you to experience the capabilities of Daytona Enterprise, demonstrat
 > [!IMPORTANT]  
 > __The information in this repository does not apply to the Daytona open source project.__  Please refer to [`daytonaio/daytona`](https://github.com/daytonaio/daytona) for information on setting up the Daytona open source project.
 
-## Deployment Instructions
-__Prerequisites:__
+## Getting Started
 
+### Requirements
 * An x86_64 Linux host operating system with minimum specs:
     * 4-core CPU
     * 16GB RAM
@@ -65,7 +67,7 @@ __Prerequisites:__
 > * [Bitbucket OAuth documentation](https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/)
 
 ### Guided Deployment
-You can deploy Daytona Enterprise Demo using a guided method provided.
+You can deploy Daytona Enterprise Demo using the guided method.
 This method will prompt you for all the information required to set up Daytona Enterprise Demo on your host machine, subsequently deploying the components required.
 
 1. Clone this repository to the host machine and run the setup script: 
@@ -84,14 +86,14 @@ This method will prompt you for all the information required to set up Daytona E
 
 ### Using Environment Variables
 You can use environment variables to configure the deployment script at run time.
-This allows you to skip the prompts in the _[Guided deployment](#guided-deployment)_ procedure.
+This allows you to skip the prompts in the [Guided deployment](#guided-deployment) procedure.
 
 1. Clone this repository to the host machine: 
 	```console
     git clone https://github.com/daytonaio/enterprise-demo
     cd enterprise-demo
     ```
-2. Set the appropriate environment variables for your identity provider in your shell, with reference to the _[Environment Variable Reference](#environment-variable-reference)_ table.
+2. Set the appropriate environment variables for your identity provider in your shell, with reference to the [Environment Variable Reference](#environment-variable-reference) table.
 3. Run `./setup.sh` with the environment variables set to start the deployment.
 
     __Example:__
@@ -108,11 +110,11 @@ You can update an existing deployment of Daytona Enterprise Demo.
     ```
     git pull origin
     ```
-2. Follow either the _[Guided Deployment](#guided-deployment)_ or _[Using Environment Variables](#using-environment-variables)_ procedure using the same variables.
+2. Follow either the [Guided Deployment](#guided-deployment) or [Using Environment Variables](#using-environment-variables) procedure using the same variables.
 
 ### Removing/Uninstalling
 You can remove a deployed version of Daytona Enterprise Demo from the host machine.
-This procedure allows you to redeploy the demo from scratch using the _[Guided Deployment](#guided-deployment)_ or _[Using Environment Variables](#using-environment-variables)_ procedure. It's also useful to reset your host machine to it's previous state before deployment.
+This procedure allows you to redeploy the demo from scratch using the [Guided Deployment](#guided-deployment) or [Using Environment Variables](#using-environment-variables) procedure. It's also useful to reset your host machine to it's previous state before deployment.
 
 * In your clone of this repository, run:
     ```console
