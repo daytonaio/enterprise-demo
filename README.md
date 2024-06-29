@@ -37,7 +37,7 @@ Try out a demo version of Daytona Enterprise on a single-node.
 The Daytona Enterprise Demo is a resource limited, single-node deployment of Daytona's enterprise offering.
 This allows you to experience the capabilities of Daytona Enterprise, demonstrating how it can streamline Development Environment Management (DEM) within your organization.
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > __The information in this repository does not apply to the Daytona open source project.__  Please refer to [`daytonaio/daytona`](https://github.com/daytonaio/daytona) for information on setting up the Daytona open source project.
 
 ## Getting Started
@@ -46,7 +46,7 @@ This allows you to experience the capabilities of Daytona Enterprise, demonstrat
 * An x86_64 Linux host operating system with minimum specs:
     * 4-core CPU
     * 16GB RAM
-    * 200GB disk
+    * 250GB disk
 * Accessible TCP ports 80, 443, and 30000
 * A registered domain with the following DNS records:
     * `<domain> IN A host.ip`
@@ -55,12 +55,15 @@ This allows you to experience the capabilities of Daytona Enterprise, demonstrat
     * __Homepage URL:__ `https://<domain>`
     * __Authorization callback URL:__ `https://id.<domain>`
 
-> [!NOTE]  
-> The deployment script has been officially tested with Ubuntu 22.04, Ubuntu 23.04, and Debian 12.
-> 
+> [!NOTE]
+> The deployment script has been officially tested on:
+> * Ubuntu 22.04, Ubuntu 23.04
+> * Debian 12
+> * Fedora 40
+>
 > If you need access to the Kubernetes cluster, ensure TCP port 6443 is open.
 
-> [!TIP]  
+> [!TIP]
 > For information on setting up an OAuth application, visit the corresponding documentation for your provider:
 > * [GitHub OAuth documentation](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app)
 > * [GitLab OAuth documentation](https://docs.gitlab.com/ee/integration/oauth_provider.html)
@@ -70,7 +73,7 @@ This allows you to experience the capabilities of Daytona Enterprise, demonstrat
 You can deploy Daytona Enterprise Demo using the guided method.
 This method will prompt you for all the information required to set up Daytona Enterprise Demo on your host machine, subsequently deploying the components required.
 
-1. Clone this repository to the host machine and run the setup script: 
+1. Clone this repository to the host machine and run the setup script:
 	```console
     git clone https://github.com/daytonaio/enterprise-demo
     cd enterprise-demo
@@ -88,7 +91,7 @@ This method will prompt you for all the information required to set up Daytona E
 You can use environment variables to configure the deployment script at run time.
 This allows you to skip the prompts in the [Guided deployment](#guided-deployment) procedure.
 
-1. Clone this repository to the host machine: 
+1. Clone this repository to the host machine:
 	```console
     git clone https://github.com/daytonaio/enterprise-demo
     cd enterprise-demo

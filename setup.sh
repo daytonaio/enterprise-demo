@@ -1,18 +1,32 @@
 #!/bin/bash
 set -e
 
+# Custom SIGINT handler
+handle_sigint() {
+    echo -e "\n${ERROR} Installation interrupted by user. Exiting..."
+    skip_cleanup=1
+    exit 1 # Exit with an error status
+}
+
+# Install the SIGINT handler
+trap 'handle_sigint' SIGINT
+
+# Adjusted EXIT trap to respect skip_cleanup
+trap '[ "$skip_cleanup" -eq 0 ] && cleanup' EXIT
+
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=UTF-8
 
 start_time=$(date +%s)
+skip_cleanup=0
 
 OK="\033[1;32m✔\033[0m"
 ERROR="\033[1;31m✘\033[0m"
 INFO="\033[1;36mℹ\033[0m"
 
-K3S_VERSION="v1.28.5+k3s1"
-LONGHORN_VERSION="1.5.3"
-INGRESS_NGINX_VERSION="4.8.3"
+K3S_VERSION="v1.29.6+k3s1"
+LONGHORN_VERSION="1.6.2"
+INGRESS_NGINX_VERSION="4.10.1"
 WATKINS_VERSION="2.94.0"
 TEMPLATE_INDEX_URL="https://raw.githubusercontent.com/daytonaio-templates/index/main/templates.json"
 
@@ -38,13 +52,40 @@ display_logo() {
     echo -e "\n"
 }
 
-machine_arch=$(uname -m)
+setup_package_manager() {
+    # Determine OS and Architecture
+    OS=$(awk -F= '/^NAME/{print $2}' /etc/os-release | tr -d '"')
+    VERSION=$(awk -F= '/^VERSION_ID/{print $2}' /etc/os-release | tr -d '"')
+    ARCH=$(uname -m)
 
-if [ "$machine_arch" != "x86_64" ]; then
-    echo -e "${ERROR} This script is intended for AMD64 (x86_64) architecture."
-    echo -e " Your machine is running on $machine_arch architecture, which is not supported."
-    exit 1
-fi
+    if [ "$ARCH" != "x86_64" ]; then
+        echo -e "${ERROR} This script is intended for AMD64 (x86_64) architecture."
+        echo -e " Your machine is running on $ARCH architecture, which is not supported."
+        exit 1
+    fi
+
+    echo -e "${INFO} Detected OS: $OS, Version: $VERSION, Architecture: $ARCH"
+
+    # Check for package manager and set commands accordingly
+    if command -v apt-get >/dev/null 2>&1; then
+        PKG_MANAGER="apt-get"
+        PKG_UPDATE="sudo $PKG_MANAGER update >/dev/null"
+        PKG_INSTALL="sudo $PKG_MANAGER install -y"
+    elif command -v dnf >/dev/null 2>&1; then
+        PKG_MANAGER="dnf"
+        PKG_UPDATE="sudo $PKG_MANAGER update -y >/dev/null"
+        PKG_INSTALL="sudo $PKG_MANAGER install -y"
+    elif command -v yum >/dev/null 2>&1; then
+        PKG_MANAGER="yum"
+        PKG_UPDATE="sudo $PKG_MANAGER update -y >/dev/null"
+        PKG_INSTALL="sudo $PKG_MANAGER install -y"
+    else
+        echo -e "${ERROR} Unsupported package manager. Exiting."
+        exit 1
+    fi
+
+    echo -e "${INFO} Using package manager: $PKG_MANAGER"
+}
 
 display_eula() {
 
@@ -69,6 +110,7 @@ display_eula() {
         echo -e "${OK} You have accepted the license agreement. Proceeding with the installation..."
     else
         echo -e "${ERROR} You have declined the license agreement. Installation aborted."
+        skip_cleanup=1
         exit 1
     fi
 }
@@ -262,17 +304,37 @@ command_exists() {
 }
 
 # Install tools needed
+# Install tools needed
 check_commands() {
+    # Determine the package manager
+    if command_exists apt-get; then
+        PKG_MANAGER="sudo apt-get"
+        PKG_UPDATE="$PKG_MANAGER update >/dev/null"
+        PKG_INSTALL="$PKG_MANAGER install -y"
+    elif command_exists dnf; then
+        PKG_MANAGER="sudo dnf"
+        PKG_UPDATE="$PKG_MANAGER update -y >/dev/null"
+        PKG_INSTALL="$PKG_MANAGER install -y"
+    elif command_exists yum; then
+        PKG_MANAGER="sudo yum"
+        PKG_UPDATE="$PKG_MANAGER update -y >/dev/null"
+        PKG_INSTALL="$PKG_MANAGER install -y"
+    else
+        echo "No compatible package manager found. Exiting."
+        exit 1
+    fi
 
+    # Install curl
     if ! command_exists "curl"; then
         echo -e "${INFO} curl is not installed. Installing..."
-        sudo apt-get update >/dev/null
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl >/dev/null
+        eval "$PKG_UPDATE"
+        eval "$PKG_INSTALL" curl >/dev/null
         if curl --version &>/dev/null; then
             echo -e "${OK} curl is installed."
         fi
     fi
 
+    # Install helm
     if ! command_exists "helm"; then
         echo -e "${INFO} helm is not installed. Installing..."
         curl -sfL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash >/dev/null
@@ -281,10 +343,11 @@ check_commands() {
         fi
     fi
 
+    # Install certbot
     if ! command_exists "certbot"; then
         echo -e "${INFO} certbot is not installed. Installing..."
-        sudo apt-get update >/dev/null
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y certbot >/dev/null
+        eval "$PKG_UPDATE"
+        eval "$PKG_INSTALL" certbot >/dev/null
         if certbot --version &>/dev/null; then
             echo -e "${OK} certbot is installed."
         fi
@@ -416,13 +479,12 @@ cleanup() {
         watkins-values.yaml
 }
 
-trap '[[ $1 != "--version" && $1 != "--help" ]] && cleanup "$1"' EXIT
-
 # Install k3s and setup kubeconfig
 install_k3s() {
 
     # Install k3s using the official installation script
     get_k3s_config
+    echo -e "${INFO} Installing k3s..."
     curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" INSTALL_K3S_EXEC="--tls-san $IP_ADDRESS --tls-san $URL" sh - 2>&1 | grep -v "Created symlink" >/dev/null
 
     # Wait for k3s to be ready
@@ -444,16 +506,19 @@ install_app() {
     kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f - >/dev/null
     kubectl apply -n longhorn-system -f https://raw.githubusercontent.com/longhorn/longhorn/v${LONGHORN_VERSION}/deploy/prerequisite/longhorn-iscsi-installation.yaml >/dev/null
     echo -e "${OK} iSCSI installed."
-    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 40)); do
+    count=0
+    while ! systemctl is-active iscsid &>/dev/null && ((++count <= 120)); do
+        # Clear the line
         echo -ne "                                                            \r"
-        echo -ne "${INFO} Checking if iscsid service is active.\r"
-        sleep 1
-        echo -ne "${INFO} Checking if iscsid service is active..\r"
-        sleep 1
-        echo -ne "${INFO} Checking if iscsid service is active...\r"
+        case $((count % 3)) in
+        0) echo -ne "${INFO} Checking if iscsid service is active.\r" ;;
+        1) echo -ne "${INFO} Checking if iscsid service is active..\r" ;;
+        2) echo -ne "${INFO} Checking if iscsid service is active...\r" ;;
+        esac
         sleep 1
     done
     # Check if the service became active or exit with an error
+    echo -ne "\r\e[K"
     if systemctl is-active iscsid &>/dev/null; then
         echo -e "${OK} iscsid service is active."
     else
@@ -578,7 +643,7 @@ display_version() {
         version=$(helm show chart oci://ghcr.io/daytonaio/charts/watkins --version "$WATKINS_VERSION" 2>/dev/null | grep 'appVersion:' | awk '{print $2}')
     else
         # Read the version line from README.md. Suitable for first time installs
-        version=$(grep -oP 'APP_VERSION-\K[0-9]+\.[0-9]+\.[0-9]+' README.md)
+        version=$(grep -oP 'App_Version-\K[0-9]+\.[0-9]+\.[0-9]+' README.md)
     fi
     echo "$version"
 }
@@ -598,9 +663,11 @@ case "$1" in
 --remove)
     display_logo
     uninstall
+    skip_cleanup=1
     ;;
 --version)
     echo "Current app version: $(display_version)"
+    skip_cleanup=1
     ;;
 --help)
     display_help
@@ -618,6 +685,7 @@ esac
 if [ "$#" -eq 0 ]; then
     display_logo
     display_eula
+    setup_package_manager
     check_commands
     check_prereq
     install_k3s
