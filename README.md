@@ -11,7 +11,7 @@
 
 [![License](https://img.shields.io/badge/License-Elastic--2.0-blue)](#license)
 [![Issues - daytona](https://img.shields.io/github/issues/daytonaio/enterprise-demo)](https://github.com/daytonaio/enterprise-demo/issues)
-![Static Badge](https://img.shields.io/badge/App_Version-8.83.2-blue)
+![Static Badge](https://img.shields.io/badge/App_Version-8.86.0-blue)
 
 </div>
 
