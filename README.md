@@ -144,7 +144,7 @@ Daytona is licensed under the [Elastic License 2.0](LICENSE). If you would like 
 This ensures that users, distributors, and other contributors can rely on all the software related to Daytona being contributed under the terms of the [License](LICENSE). No contributions will be accepted without following this process.
 
 ## License
-This repository contains the Daytona Enterprise Demo installer, covered under the [Elastic License 2.0](LICENSE), except where noted (any Daytona logos or trademarks are not covered under the Elastic License, and should be explicitly noted by a LICENSE file.)
+This repository contains the Daytona Enterprise Demo installer, covered under the [Elastic License 2.0](LICENSE.txt), except where noted (any Daytona logos or trademarks are not covered under the Elastic License, and should be explicitly noted by a LICENSE file.)
 
 Others are allowed to make their own distribution of the software in this repository under the license, but they cannot use any of the Daytona trademarks, cloud services, etc.
 
