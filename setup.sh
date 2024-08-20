@@ -27,7 +27,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.29.6+k3s1"
 LONGHORN_VERSION="1.6.2"
 INGRESS_NGINX_VERSION="4.10.1"
-WATKINS_VERSION="2.94.0"
+WATKINS_VERSION="2.103.1"
 TEMPLATE_INDEX_URL="https://raw.githubusercontent.com/daytonaio-templates/index/main/templates.json"
 
 display_logo() {
@@ -256,7 +256,7 @@ check_prereq() {
         ATTEMPT=0
         while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
             if sudo certbot certonly --manual --preferred-challenges=dns --register-unsafely-without-email \
-                --server https://acme-v02.api.letsencrypt.org/directory --agree-tos --manual-public-ip-logging-ok \
+                --server https://acme-v02.api.letsencrypt.org/directory --agree-tos \
                 -d "*.$URL,$URL"; then
                 echo -e "${OK} Certificate validated."
                 break
@@ -402,7 +402,15 @@ image:
 namespaceOverride: "watkins"
 fullnameOverride: "watkins"
 configuration:
-  defaultWorkspaceClassName: small
+  defaultWorkspaceClass:
+    cpu: 2
+    gpu: ""
+    memory: 8
+    name: Default
+    storage: 50
+    usageMultiplier: 1
+    runtimeClass: sysbox-runc
+    gpuResourceName: nvidia.com/gpu
   workspaceStorageClass: longhorn
   defaultPlanPinnedWorkspaces: 10
   defaultSubscriptionSeats: 10
@@ -584,7 +592,10 @@ install_app() {
 
     echo -e "${OK} k3s cluster and Watkins application installed in $(get_time)."
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
-    echo -e "${INFO} To access dashboard go to https://${URL}"
+    echo -e "${INFO} To access admin dashboard go to https://admin.${URL}"
+    echo -e "\n--------------------------------------------------------------------------------------------------\n"
+    echo -e "  Username: admin"
+    echo -e "  Password: $(kubectl get secret -n watkins watkins -o=jsonpath='{.data.admin-password}' | base64 --decode)"
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
     echo -e "${INFO} To access keycloak admin console go to https://id.${URL}"
     echo -e "  Username: admin"
@@ -602,7 +613,7 @@ install_app() {
         echo -e "${OK} Watkins workspace container image pulled."
     fi
 
-    while kubectl get pods -n watkins --ignore-not-found=true | grep "pull-image" >/dev/null; do
+    while kubectl get pods -n watkins-workspaces --ignore-not-found=true | grep "pull-image" >/dev/null; do
         echo -ne "                                                            \r"
         echo -ne "${INFO} Waiting on watkins workspace storageClass preload.\r"
         sleep 1
