@@ -40,6 +40,9 @@ This allows you to experience the capabilities of Daytona Enterprise, demonstrat
 > [!IMPORTANT]
 > __The information in this repository does not apply to the Daytona open source project.__  Please refer to [`daytonaio/daytona`](https://github.com/daytonaio/daytona) for information on setting up the Daytona open source project.
 
+> [!IMPORTANT]
+> After the installation and setup process is complete, you will need a license to use Daytona Enterprise Demo. Currently, you can obtain a license by sending a request to servicedesk@daytona.io.
+
 ## Getting Started
 
 ### Requirements
@@ -69,42 +72,34 @@ This allows you to experience the capabilities of Daytona Enterprise, demonstrat
 > * [GitLab OAuth documentation](https://docs.gitlab.com/ee/integration/oauth_provider.html)
 > * [Bitbucket OAuth documentation](https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/)
 
-### Guided Deployment
-You can deploy Daytona Enterprise Demo using the guided method.
-This method will prompt you for all the information required to set up Daytona Enterprise Demo on your host machine, subsequently deploying the components required.
+### Tools Installed
+The setup script installs the following tools/packages on your host:
 
-1. Clone this repository to the host machine and run the setup script:
-	```console
+- **K3s**: A lightweight Kubernetes distribution
+- **kubectl**: Command-line tool for interacting with Kubernetes clusters (included with K3s)
+- **Helm**: The package manager for Kubernetes
+- **jq**: Command-line JSON processor
+- **curl**: Command-line tool for transferring data using various protocols
+
+### Deployment
+You can deploy Daytona Enterprise Demo either by using the guided method or by setting the URL environment variable.
+
+#### Guided Deployment
+1. Clone this repository to the host machine and run the script:
+    ```console
     git clone https://github.com/daytonaio/enterprise-demo
     cd enterprise-demo
     ./setup.sh
     ```
-2. When prompted, enter the following information:
-    1. __App hostname (FQDN):__ The registered domain (`<domain>`)
-    2. __Identity provider (IdP):__ Your chosen identity provider
-    3. __IdP Client ID:__ The client ID associated with your OAuth application
-    4. __IdP Client Secret:__ The client secret associated with your OAuth application
-3. Enter any additional information prompted for based on your selection of identity provider.
-4. Follow the instructions output by the script to configure required DNS records.
+#### Using Environment Variables
+1. Clone this repository to the host machine and run the script by setting the URL directly:
+     ```console
+     git clone https://github.com/daytonaio/enterprise-demo
+     cd enterprise-demo
+     URL="daytona.example.com" ./setup.sh
+     ```
 
-### Using Environment Variables
-You can use environment variables to configure the deployment script at run time.
-This allows you to skip the prompts in the [Guided deployment](#guided-deployment) procedure.
-
-1. Clone this repository to the host machine:
-	```console
-    git clone https://github.com/daytonaio/enterprise-demo
-    cd enterprise-demo
-    ```
-2. Set the appropriate environment variables for your identity provider in your shell, with reference to the [Environment Variable Reference](#environment-variable-reference) table.
-3. Run `./setup.sh` with the environment variables set to start the deployment.
-
-    __Example:__
-
-    ```console
-    URL="daytona.example.com" IDP="github" IDP_ID="changeme" IDP_SECRET="changeme" ./setup.sh
-    ```
-4. Follow the instructions output by the script to configure required DNS records.
+2. Follow the instructions output by the script to configure required DNS records.
 
 ### Updating
 You can update an existing deployment of Daytona Enterprise Demo.
@@ -129,11 +124,7 @@ This procedure allows you to redeploy the demo from scratch using the [Guided De
 | Environment variable | Required? | Description |
 | -------------------- | --------- | ----------- |
 | `URL` | Yes | The domain name (`<domain>`) used to access Daytona. |
-| `IDP` | Yes | One of `github`, `gitlab`, `bitbucket`, `gitlabSelfManaged`, `githubEnterpriseServer`. |
-| `IDP_ID` | Yes | Client ID from by the provider's OAuth application. |
-| `IDP_SECRET` | Yes | Client secret from the provider's OAuth application. |
-| `IDP_URL` | Only for IdPs `gitlabSelfManaged` or `gitHubEnterpriseServer` | Base URL for your hosted Git provider. |
-| `IDP_API_URL` | Only for IdP `githubEnterpriseServer` | API base URL for your GitHub Enterprise Server. |
+
 
 ## Contributing
 Daytona is licensed under the [Elastic License 2.0](LICENSE). If you would like to contribute to the software, you must:

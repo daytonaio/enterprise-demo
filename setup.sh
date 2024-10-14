@@ -4,31 +4,26 @@ set -e
 # Custom SIGINT handler
 handle_sigint() {
     echo -e "\n${ERROR} Installation interrupted by user. Exiting..."
-    skip_cleanup=1
-    exit 1 # Exit with an error status
+    echo -e "${INFO} Clean up and try again, run './setup.sh --remove' and then restart the installation."
+    exit 1
 }
 
 # Install the SIGINT handler
 trap 'handle_sigint' SIGINT
 
-# Adjusted EXIT trap to respect skip_cleanup
-trap '[ "$skip_cleanup" -eq 0 ] && cleanup' EXIT
-
 export LC_ALL=en_US.UTF-8
 export LC_CTYPE=UTF-8
 
 start_time=$(date +%s)
-skip_cleanup=0
 
 OK="\033[1;32m✔\033[0m"
 ERROR="\033[1;31m✘\033[0m"
 INFO="\033[1;36mℹ\033[0m"
 
-K3S_VERSION="v1.29.6+k3s1"
-LONGHORN_VERSION="1.6.2"
-INGRESS_NGINX_VERSION="4.10.1"
-WATKINS_VERSION="2.94.0"
-TEMPLATE_INDEX_URL="https://raw.githubusercontent.com/daytonaio-templates/index/main/templates.json"
+K3S_VERSION="v1.29.8+k3s1"
+LONGHORN_VERSION="1.6.3"
+INGRESS_NGINX_VERSION="4.11.3"
+WATKINS_VERSION="2.109.1"
 
 display_logo() {
     echo -e "\n"
@@ -110,7 +105,6 @@ display_eula() {
         echo -e "${OK} You have accepted the license agreement. Proceeding with the installation..."
     else
         echo -e "${ERROR} You have declined the license agreement. Installation aborted."
-        skip_cleanup=1
         exit 1
     fi
 }
@@ -148,93 +142,19 @@ check_prereq() {
         local var_name="$1"
         local prompt="$2"
 
-        if [ -z "${!var_name}" ]; then
-            if [ "$var_name" == "IDP_SECRET" ]; then
-                read -rs -p "$prompt" "${var_name?}"
-            elif [ "$var_name" == "IDP" ]; then
-                echo -e "$prompt"
-                PS3="Choose an IdP (type the number and press Enter): "
-                options=("github" "gitlab" "bitbucket" "gitlabSelfManaged" "githubEnterpriseServer")
-                select opt in "${options[@]}"; do
-                    case $REPLY in
-                    1)
-                        IDP="github"
-                        break
-                        ;;
-                    2)
-                        IDP="gitlab"
-                        break
-                        ;;
-                    3)
-                        IDP="bitbucket"
-                        break
-                        ;;
-                    4)
-                        IDP="gitlabSelfManaged"
-                        break
-                        ;;
-                    5)
-                        IDP="githubEnterpriseServer"
-                        break
-                        ;;
-                    *) echo "Invalid option, please choose a number between 1 and 5." ;;
-                    esac
-                done
-            else
-                read -r -p "$prompt" "${var_name?}"
-            fi
-        fi
-
+        while [ -z "${!var_name}" ]; do
+            read -r -p "$prompt" "${var_name?}"
+        done
     }
 
-    if [ -n "$IDP" ]; then
-        supported_idps=("github" "gitlab" "bitbucket" "gitlabSelfManaged" "githubEnterpriseServer")
-        is_supported=false
+    # Check if URL is set, if not, prompt for it
+    check_and_prompt "URL" "Enter app hostname (valid domain) [FQDN]: "
 
-        for supported_idp in "${supported_idps[@]}"; do
-            if [ "$supported_idp" = "$IDP" ]; then
-                is_supported=true
-                break
-            fi
-        done
-
-        if $is_supported; then
-            echo -e "${OK} Using IdP from CLI argument: $IDP"
-        else
-            echo -e "${ERROR} IdP not supported. You will be prompted to choose a supported one."
-            unset IDP
-        fi
-    fi
-
-    # Check again if any of the values are missing
-    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
-        echo -e "${INFO} Please check README on how to obtain values for required variables"
-        echo -e "\e[1;34m  https://github.com/daytonaio/installer#requirements\e[0m\n"
-        check_and_prompt "URL" "Enter app hostname (valid domain) [FQDN]: "
-        check_and_prompt "IDP" "Identity Providers (IdP) available [IDP]: "
-        if [ "$IDP" == "gitlabSelfManaged" ]; then
-            check_and_prompt "IDP_URL" "Enter the base URL for GitLab self-managed [IDP_URL]: "
-        fi
-        if [ "$IDP" == "githubEnterpriseServer" ]; then
-            check_and_prompt "IDP_URL" "Enter the base URL for GitHub Enterprise [IDP_URL]: "
-            check_and_prompt "IDP_API_URL" "Enter the API URL for GitHub Enterprise [IDP_API_URL]: "
-        fi
-        check_and_prompt "IDP_ID" "Enter IdP Client ID [IDP_ID]: "
-        check_and_prompt "IDP_SECRET" "Enter IdP Client Secret [IDP_SECRET] (input hidden): "
-        #echo -e "\n"
-    fi
-
-    if [ -z "$URL" ] || [ -z "$IDP" ] || [ -z "$IDP_ID" ] || [ -z "$IDP_SECRET" ]; then
-        echo -e "\n${ERROR} One or more of the required variables are not set. Please repeat installation script. Exiting..."
-        exit 1
-    elif [ "$IDP" == "gitlabSelfManaged" ] && [ -z "$IDP_URL" ]; then
-        echo -e "\n${ERROR} IDP_URL is not set for gitlabSelfManaged. Please set IDP_URL. Exiting..."
-        exit 1
-    elif [ "$IDP" == "githubEnterpriseServer" ] && ([ -z "$IDP_URL" ] || [ -z "$IDP_API_URL" ]); then
-        echo -e "\n${ERROR} IDP_URL and/or IDP_API_URL is not set for githubEnterpriseServer. Please set both. Exiting..."
+    if [ -z "$URL" ]; then
+        echo -e "\n${ERROR} URL variable is not set. Please set URL. Exiting..."
         exit 1
     else
-        echo -e "${OK} All required variables set."
+        echo -e "${OK} URL variable is set."
     fi
 
     # Use certbot to get wildcard cert for your domain
@@ -256,7 +176,7 @@ check_prereq() {
         ATTEMPT=0
         while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
             if sudo certbot certonly --manual --preferred-challenges=dns --register-unsafely-without-email \
-                --server https://acme-v02.api.letsencrypt.org/directory --agree-tos --manual-public-ip-logging-ok \
+                --server https://acme-v02.api.letsencrypt.org/directory --agree-tos \
                 -d "*.$URL,$URL"; then
                 echo -e "${OK} Certificate validated."
                 break
@@ -283,13 +203,9 @@ check_helm_release() {
     status=$(helm status -n "$namespace" "$release_name" 2>/dev/null | awk '/STATUS:/{print $2}')
 
     if [[ "$status" != "deployed" ]]; then
-        echo -e "${ERROR} The release $release_name is not deployed. Please repeat installation script. Exiting..."
-        helm delete -n "$namespace" "$release_name" --ignore-not-found
-        if [[ "$release_name" == "watkins" && "$watkins_first_install" == "yes" ]]; then
-            echo -e "${INFO} Removing watkins PVCs..."
-            kubectl delete pvc --all -n "$namespace" --ignore-not-found >/dev/null
-            exit 1
-        fi
+        echo -e "${ERROR} The release $release_name is not deployed correctly."
+        echo -e "${INFO} Please check for errors on the cluster related to $release_name."
+        echo -e "${INFO} After addressing the problem, run './setup.sh --remove' first and then try the installation again."
         exit 1
     fi
 
@@ -402,7 +318,15 @@ image:
 namespaceOverride: "watkins"
 fullnameOverride: "watkins"
 configuration:
-  defaultWorkspaceClassName: small
+  defaultWorkspaceClass:
+    cpu: 2
+    gpu: ""
+    memory: 8
+    name: Default
+    storage: 50
+    usageMultiplier: 1
+    runtimeClass: ""
+    gpuResourceName: nvidia.com/gpu
   workspaceStorageClass: longhorn
   defaultPlanPinnedWorkspaces: 10
   defaultSubscriptionSeats: 10
@@ -424,17 +348,10 @@ ingress:
       secretName: "$URL-tls"
 components:
   dashboard:
-    workspaceTemplatesIndexUrl: $TEMPLATE_INDEX_URL
     namespace: watkins
     excludeJetbrainsCodeEditors: false
 postgresql:
   enabled: true
-gitProviders:
-  $IDP:
-    clientId: $IDP_ID
-    clientSecret: $IDP_SECRET
-    baseUrl: $IDP_URL
-    apiUrl: $IDP_API_URL
 rabbitmq:
   enabled: true
   nameOverride: "watkins-rabbitmq"
@@ -465,18 +382,6 @@ disable-helm-controller: true
 cluster-init: false  # use sqlite instead embedded Etcd
 EOF'
 
-}
-
-cleanup() {
-    calling_function="cleanup"
-    echo -e "${INFO} Cleaning up..."
-
-    if [[ $1 != "--remove" ]]; then
-        check_helm_release watkins watkins
-    fi
-    rm -rf ingress-values.yaml \
-        longhorn-values.yaml \
-        watkins-values.yaml
 }
 
 # Install k3s and setup kubeconfig
@@ -551,13 +456,13 @@ install_app() {
 
     echo -e "${INFO} Installing longhorn helm chart"
     get_longhorn_values
-    helm upgrade -i --atomic --create-namespace --version ${LONGHORN_VERSION} -n longhorn-system -f longhorn-values.yaml --repo https://charts.longhorn.io longhorn longhorn >/dev/null
+    helm upgrade -i --create-namespace --version ${LONGHORN_VERSION} -n longhorn-system -f longhorn-values.yaml --repo https://charts.longhorn.io longhorn longhorn >/dev/null
     check_helm_release longhorn longhorn-system
 
     # Setup ingress-nginx
     echo -e "${INFO} Installing ingress-nginx helm chart"
     get_ingress_values
-    helm upgrade -i --atomic --version ${INGRESS_NGINX_VERSION} -n kube-system -f ingress-values.yaml --repo https://kubernetes.github.io/ingress-nginx ingress-nginx ingress-nginx >/dev/null
+    helm upgrade -i --version ${INGRESS_NGINX_VERSION} -n kube-system -f ingress-values.yaml --repo https://kubernetes.github.io/ingress-nginx ingress-nginx ingress-nginx >/dev/null
     check_helm_release ingress-nginx kube-system
 
     # Create wildcard certificate secret to be used by ingress
@@ -578,17 +483,25 @@ install_app() {
         watkins_first_install="no"
         echo -e "${INFO} Updating watkins helm chart..."
     fi
-    helm upgrade -i --atomic --timeout 10m --version "${WATKINS_VERSION}" -n watkins \
+    helm upgrade -i --timeout 10m --version "${WATKINS_VERSION}" -n watkins \
         -f watkins-values.yaml watkins oci://ghcr.io/daytonaio/charts/watkins >/dev/null
     check_helm_release watkins watkins
 
     echo -e "${OK} k3s cluster and Watkins application installed in $(get_time)."
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
-    echo -e "${INFO} To access dashboard go to https://${URL}"
+    echo -e "${INFO} To access admin dashboard go to https://admin.${URL}"
+    echo -e "\n--------------------------------------------------------------------------------------------------\n"
+    echo -e "  Username: admin"
+    echo -e "  Password: $(kubectl get secret -n watkins watkins -o=jsonpath='{.data.admin-password}' | base64 --decode)"
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
     echo -e "${INFO} To access keycloak admin console go to https://id.${URL}"
     echo -e "  Username: admin"
     echo -e "  Password: $(kubectl get secret -n watkins watkins-watkins-keycloak -o=jsonpath='{.data.admin-password}' | base64 --decode)"
+    echo -e "\n--------------------------------------------------------------------------------------------------\n"
+    echo -e "${INFO} IMPORTANT: Obtaining a License"
+    echo -e "To use Daytona Enterprise Demo, you need to obtain a license."
+    echo -e "Please send a request to servicedesk@daytona.io to get your license."
+    echo -e "Once you receive the license, you can apply it through the admin dashboard."
     echo -e "\n--------------------------------------------------------------------------------------------------\n"
     start_time=$(date +%s)
     echo -e "${INFO} You are advised to wait for preload operations to finish before you create your first workspace."
@@ -602,7 +515,7 @@ install_app() {
         echo -e "${OK} Watkins workspace container image pulled."
     fi
 
-    while kubectl get pods -n watkins --ignore-not-found=true | grep "pull-image" >/dev/null; do
+    while kubectl get pods -n watkins-workspaces --ignore-not-found=true | grep "pull-image" >/dev/null; do
         echo -ne "                                                            \r"
         echo -ne "${INFO} Waiting on watkins workspace storageClass preload.\r"
         sleep 1
@@ -613,6 +526,11 @@ install_app() {
     done
     echo -e "${OK} Watkins workspace storageClass preloaded."
     echo -e "${OK} Preload operations completed in $(get_time)."
+
+    # Delete leftover resources
+    rm -rf ingress-values.yaml \
+        longhorn-values.yaml \
+        watkins-values.yaml
 }
 
 # Function to uninstall k3s and remove longhorn data
@@ -636,6 +554,11 @@ uninstall() {
     if sudo rm -rf /var/lib/longhorn/*; then
         echo -e "${OK} Longhorn data has been removed."
     fi
+
+    # Delete leftover resources
+    rm -rf ingress-values.yaml \
+        longhorn-values.yaml \
+        watkins-values.yaml
 }
 
 display_version() {
@@ -661,13 +584,10 @@ display_help() {
 # Process the provided parameter
 case "$1" in
 --remove)
-    display_logo
     uninstall
-    skip_cleanup=1
     ;;
 --version)
     echo "Current app version: $(display_version)"
-    skip_cleanup=1
     ;;
 --help)
     display_help
