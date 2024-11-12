@@ -23,7 +23,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.29.8+k3s1"
 LONGHORN_VERSION="1.6.3"
 INGRESS_NGINX_VERSION="4.11.3"
-WATKINS_VERSION="2.109.1"
+WATKINS_VERSION="2.112.0"
 
 display_logo() {
     echo -e "\n"
@@ -389,6 +389,7 @@ install_k3s() {
 
     # Install k3s using the official installation script
     get_k3s_config
+    IP_ADDRESS=$(get_public_ip_address)
     echo -e "${INFO} Installing k3s..."
     curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" INSTALL_K3S_EXEC="--tls-san $IP_ADDRESS --tls-san $URL" sh - 2>&1 | grep -v "Created symlink" >/dev/null
 
