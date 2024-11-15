@@ -23,7 +23,7 @@ INFO="\033[1;36mℹ\033[0m"
 K3S_VERSION="v1.29.8+k3s1"
 LONGHORN_VERSION="1.6.3"
 INGRESS_NGINX_VERSION="4.11.3"
-WATKINS_VERSION="2.112.0"
+WATKINS_VERSION="2.114.1"
 
 display_logo() {
     echo -e "\n"
@@ -194,6 +194,25 @@ check_prereq() {
     fi
 }
 
+wait_for_ingress_webhook() {
+    echo -e "${INFO} Waiting for Ingress Nginx admission webhook to be ready..."
+    local max_attempts=15
+    local attempt=0
+    while [ $attempt -lt $max_attempts ]; do
+        if kubectl get validatingwebhookconfigurations ingress-nginx-admission &>/dev/null; then
+            if kubectl get endpoints -n kube-system ingress-nginx-controller-admission &>/dev/null; then
+                echo -e "${OK} Ingress Nginx admission webhook is ready."
+                return 0
+            fi
+        fi
+        echo -ne "Attempt $((attempt + 1))/$max_attempts - waiting...\r"
+        attempt=$((attempt + 1))
+        sleep 2
+    done
+    echo -e "${ERROR} Timed out waiting for Ingress Nginx admission webhook."
+    return 1
+}
+
 # Check if helm release is installed. i - Need testing
 check_helm_release() {
     local release_name="$1"
@@ -207,9 +226,7 @@ check_helm_release() {
         echo -e "${INFO} Please check for errors on the cluster related to $release_name."
         echo -e "${INFO} After addressing the problem, run './setup.sh --remove' first and then try the installation again."
         exit 1
-    fi
-
-    if [[ "$calling_function" != "cleanup" ]]; then
+    else
         echo -e "${OK} The release '$release_name' is deployed."
     fi
 }
@@ -380,6 +397,8 @@ disable:
   - servicelb
 disable-helm-controller: true
 cluster-init: false  # use sqlite instead embedded Etcd
+node-label:
+  - "daytona.io/node-role=workload"
 EOF'
 
 }
@@ -463,8 +482,11 @@ install_app() {
     # Setup ingress-nginx
     echo -e "${INFO} Installing ingress-nginx helm chart"
     get_ingress_values
-    helm upgrade -i --version ${INGRESS_NGINX_VERSION} -n kube-system -f ingress-values.yaml --repo https://kubernetes.github.io/ingress-nginx ingress-nginx ingress-nginx >/dev/null
+    helm upgrade -i --wait --timeout 5m --version ${INGRESS_NGINX_VERSION} -n kube-system -f ingress-values.yaml --repo https://kubernetes.github.io/ingress-nginx ingress-nginx ingress-nginx >/dev/null
     check_helm_release ingress-nginx kube-system
+
+    # Wait for the Ingress Nginx admission webhook to be ready
+    wait_for_ingress_webhook || exit 1
 
     # Create wildcard certificate secret to be used by ingress
     kubectl create namespace watkins --dry-run=client -o yaml | kubectl apply -f - >/dev/null
@@ -478,10 +500,8 @@ install_app() {
 
     get_watkins_values
     if ! helm status -n watkins watkins >/dev/null 2>&1; then
-        watkins_first_install="yes"
         echo -e "${INFO} Installing watkins helm chart..."
     else
-        watkins_first_install="no"
         echo -e "${INFO} Updating watkins helm chart..."
     fi
     helm upgrade -i --timeout 10m --version "${WATKINS_VERSION}" -n watkins \
